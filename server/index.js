@@ -1,17 +1,19 @@
+// Load environment variables FIRST before any imports that depend on them
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { v4 as uuidv4 } from "uuid";
 import multer from "multer";
 import path from "path";
+// Supabase is now lazy-loaded, so it's safe to import here
 import { supabase } from "./lib/supabase.js";
 import { authenticateToken } from "./middleware/auth.js";
 import { getWebResults, shouldTriggerWebSearch, formatSearchResults } from "./utils/web-search.js";
 import { getWeatherData, shouldTriggerWeatherSearch, extractLocationFromMessage, formatWeatherResults } from "./utils/weather.js";
 import { processUploadedFiles } from "./utils/file-processor.js";
-
-dotenv.config();
 
 const PORT = process.env.PORT || 5000;
 const app = express();
@@ -848,10 +850,72 @@ app.use((req, res) => {
   });
 });
 
-app.listen(PORT, () => {
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  // Log but don't exit - keep server running
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  // Log but don't exit - keep server running
+});
+
+// Keep process alive - handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('⚠️ SIGTERM received, shutting down gracefully...');
+  clearInterval(keepAliveInterval);
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('⚠️ SIGINT received, shutting down gracefully...');
+  clearInterval(keepAliveInterval);
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+const server = app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
   console.log(`💬 Chat endpoint: http://localhost:${PORT}/api/chat`);
   console.log(`📖 Get chat history: http://localhost:${PORT}/api/chat/history`);
+  console.log(`\n🔄 Server is ready and waiting for requests...\n`);
+});
+
+// Keep the process alive
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+
+// Explicitly keep the event loop alive
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use. Please use a different port.`);
+    process.exit(1);
+  } else {
+    console.error('❌ Server error:', error);
+  }
+});
+
+// Prevent the process from exiting - keep event loop alive
+// This interval ensures Node.js doesn't exit when there are no active connections
+const keepAliveInterval = setInterval(() => {
+  // This keeps the event loop active
+  // The server itself should keep the process alive, but this is a safety measure
+}, 1000);
+
+// Clean up on shutdown
+process.on('SIGTERM', () => {
+  clearInterval(keepAliveInterval);
+});
+
+process.on('SIGINT', () => {
+  clearInterval(keepAliveInterval);
 });
 

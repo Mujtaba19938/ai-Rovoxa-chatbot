@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Search, ExternalLink, Clock, Globe } from "lucide-react"
 import { toast } from "sonner"
+import { getApiUrl } from "@/lib/api"
 
 interface SearchResult {
   rank: number
@@ -47,7 +48,7 @@ export const WebSearchTest: React.FC = () => {
         return
       }
 
-      const response = await fetch('http://localhost:5000/api/search', {
+      const response = await fetch(getApiUrl('/api/search'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

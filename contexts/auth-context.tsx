@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import { getApiUrl } from "@/lib/api"
 
 interface User {
   _id: string
@@ -52,7 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (storedToken && storedUser) {
           // Verify token is still valid
-          const response = await fetch("http://localhost:5000/api/auth/me", {
+          const response = await fetch(getApiUrl("/api/auth/me"), {
             headers: {
               Authorization: `Bearer ${storedToken}`,
             },
@@ -84,7 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshTokenFromStorage = async (refreshToken: string) => {
     try {
-      const response = await fetch("http://localhost:5000/api/auth/refresh", {
+      const response = await fetch(getApiUrl("/api/auth/refresh"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -117,13 +118,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const login = async (email: string, password: string) => {
-    const response = await fetch("http://localhost:5000/api/auth/login", {
+    const apiUrl = getApiUrl("/api/auth/login");
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password }),
     })
+
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      console.error("❌ Non-JSON response received:", text.substring(0, 200));
+      throw new Error(`Server returned HTML instead of JSON. Check if backend is running at ${apiUrl}`);
+    }
 
     const data = await response.json()
 
@@ -139,13 +149,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const register = async (email: string, password: string, name: string) => {
-    const response = await fetch("http://localhost:5000/api/auth/register", {
+    const apiUrl = getApiUrl("/api/auth/register");
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password, name }),
     })
+
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      console.error("❌ Non-JSON response received:", text.substring(0, 200));
+      throw new Error(`Server returned HTML instead of JSON. Check if backend is running at ${apiUrl}`);
+    }
 
     const data = await response.json()
 

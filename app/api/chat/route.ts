@@ -1,6 +1,8 @@
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30
 
+import { getApiUrl } from '@/lib/api'
+
 export async function POST(req: Request) {
   try {
     let requestData;
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
     }
 
     // Proxy the request to the Express server with authentication
-    const expressResponse = await fetch('http://localhost:5000/api/chat', {
+    const expressResponse = await fetch(getApiUrl('/api/chat'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

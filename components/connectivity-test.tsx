@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle, XCircle, Clock, Globe, Wifi, AlertTriangle } from 'lucide-react'
+import { getApiUrl } from '@/lib/api'
 
 interface TestResult {
   name: string
@@ -111,7 +112,7 @@ export const ConnectivityTest: React.FC = () => {
           
           return {
             name: 'Internet Time Sync',
-            status: timeDiff < 60000 ? 'success' : 'warning',
+            status: (timeDiff < 60000 ? 'success' : 'warning') as 'success' | 'warning',
             message: `Internet time: ${internetTime.toLocaleString()}`,
             details: `Local time: ${localTime.toLocaleString()}, Difference: ${Math.round(timeDiff / 1000)}s`,
             timestamp: new Date().toISOString()
@@ -137,7 +138,7 @@ export const ConnectivityTest: React.FC = () => {
     // Test 4: Local Server Connectivity
     const testLocalServer = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/health', {
+        const response = await fetch(getApiUrl('/api/health'), {
           method: 'GET',
           headers: { 'User-Agent': 'AI-Orb-Chatbot-Test/1.0' }
         })

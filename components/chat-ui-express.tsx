@@ -61,6 +61,7 @@ import { useTheme } from "next-themes"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
+import { getApiUrl } from "@/lib/api"
 
 interface Message {
   id: string
@@ -130,7 +131,7 @@ const ChatUI: React.FC = () => {
 
   const sendMessageToGemini = async (userMessage: string) => {
     try {
-      const response = await fetch("http://localhost:5000/api/chat", {
+      const response = await fetch(getApiUrl("/api/chat"), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

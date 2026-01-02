@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useChatHistory } from "@/hooks/use-chat-history"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+import { getApiUrl } from "@/lib/api"
 
 interface ChatSidebarProps {
   isOpen: boolean
@@ -61,7 +62,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         return
       }
 
-      const response = await fetch(`http://localhost:5000/api/chat/${chatId}`, {
+      const response = await fetch(getApiUrl(`/api/chat/${chatId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

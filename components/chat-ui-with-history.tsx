@@ -23,6 +23,7 @@ import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { ChatSidebar } from "./chat-sidebar"
 import { ThemeSelector } from "./theme-selector"
+import { getApiUrl } from "@/lib/api"
 
 const ChatUIWithHistory: React.FC = () => {
   const { token, logout } = useAuth()
@@ -108,7 +109,7 @@ const ChatUIWithHistory: React.FC = () => {
         });
         
         // Send the message with files
-        const response = await fetch('http://localhost:5000/api/chat', {
+        const response = await fetch(getApiUrl('/api/chat'), {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -263,7 +264,7 @@ const ChatUIWithHistory: React.FC = () => {
         return
       }
       
-      const response = await fetch('http://localhost:5000/api/chat/create', {
+      const response = await fetch(getApiUrl('/api/chat/create'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

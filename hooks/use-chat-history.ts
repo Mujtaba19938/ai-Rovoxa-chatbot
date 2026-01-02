@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getUserID } from '@/lib/user-utils';
+import { getApiUrl } from '@/lib/api';
 
 interface Message {
   sender: 'user' | 'ai';
@@ -59,7 +60,7 @@ export const useChatHistory = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
       
-      const response = await fetch(`http://localhost:5000/api/chat/history`, {
+      const response = await fetch(getApiUrl('/api/chat/history'), {
         headers: {
           'Authorization': `Bearer ${token}`
         },
@@ -116,7 +117,7 @@ export const useChatHistory = () => {
       console.log('🗑️ Clearing chat history for user:', userId);
       
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/chat/history`, {
+      const response = await fetch(getApiUrl('/api/chat/history'), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

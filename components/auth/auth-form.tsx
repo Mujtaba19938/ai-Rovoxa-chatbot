@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Mail, Lock, User, Eye, EyeOff, CheckCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
+import { getApiUrl } from "@/lib/api"
 
 interface AuthFormProps {
   onSuccess?: (user: any, token: string) => void
@@ -79,7 +80,8 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
       } else {
         // For registration, don't automatically log in
         // Instead, make a direct API call to register without using the auth context
-        const response = await fetch("http://localhost:5000/api/auth/register", {
+        const apiUrl = getApiUrl("/api/auth/register");
+        const response = await fetch(apiUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -90,6 +92,14 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
             name: formData.name
           }),
         })
+        
+        // Check if response is JSON before parsing
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await response.text();
+          console.error("❌ Non-JSON response received:", text.substring(0, 200));
+          throw new Error(`Server returned HTML instead of JSON. Check if backend is running at ${apiUrl}`);
+        }
         
         const data = await response.json()
         
