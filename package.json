@@ -13,6 +13,7 @@
     "backend": "node server/index.js",
     "backend:dev": "node server/index.js",
     "setup:mongodb": "node scripts/setup-mongodb.js",
+    "test:mongodb": "node scripts/test-mongodb-connection.js",
     "setup": "npm run setup:mongodb",
     "start:dev": "node scripts/start-dev.js",
     "dev:all": "npm run start:dev"
@@ -70,6 +71,7 @@
     "input-otp": "^1.4.1",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.468.0",
+    "mongodb": "^7.0.0",
     "mongoose": "^8.19.1",
     "multer": "^2.0.2",
     "next": "15.4.10",
