@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * Modern AI Orb Chat Interface
+ * Rovoxa Chat Interface
  * 
  * This component provides a sleek, minimal, and premium chat interface similar to ChatGPT/Claude.
  * 
@@ -245,8 +245,8 @@ const ChatUI: React.FC = () => {
           >
             <SafeOrbWrapper orbSize={2.2} animationState={currentOrbAnimationState} />
           </motion.div>
-          <h1 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            AI Orb Chat
+          <h1 className="text-lg sm:text-xl font-semibold rovoxa-text-primary">
+            Rovoxa
           </h1>
         </div>
         

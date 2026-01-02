@@ -6,8 +6,8 @@ import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'AI Orb Chatbot',
-  description: 'An intelligent chatbot with animated orb interface',
+  title: 'Rovoxa',
+  description: 'Your intelligent AI chatbot that engages, converts, and supports users 24/7',
   generator: 'v0.app',
   icons: {
     icon: '/favicon.png',

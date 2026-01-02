@@ -64,7 +64,7 @@ const ChatUI: React.FC = () => {
           >
             <SafeOrbWrapper orbSize={2.2} animationState={currentOrbAnimationState} />
           </motion.div>
-          <h1 className="text-xl font-semibold">AI Orb Chat</h1>
+          <h1 className="text-xl font-semibold">Rovoxa</h1>
         </div>
         <div className="flex items-center space-x-3">
           <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
