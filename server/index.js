@@ -1,16 +1,12 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import jwt from "jsonwebtoken";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { v4 as uuidv4 } from "uuid";
 import multer from "multer";
 import path from "path";
-import connectDB from "./config/database.js";
-import Chat from "./models/Chat.js";
-import User from "./models/User.js";
-import { authenticateToken, generateToken, generateRefreshToken } from "./middleware/auth.js";
-import memoryStore from "./utils/memory-store.js";
+import { supabase } from "./lib/supabase.js";
+import { authenticateToken } from "./middleware/auth.js";
 import { getWebResults, shouldTriggerWebSearch, formatSearchResults } from "./utils/web-search.js";
 import { getWeatherData, shouldTriggerWeatherSearch, extractLocationFromMessage, formatWeatherResults } from "./utils/weather.js";
 import { processUploadedFiles } from "./utils/file-processor.js";
@@ -54,20 +50,19 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-// Connect to MongoDB (optional)
-let dbConnected = false;
-connectDB().then(connected => {
-  dbConnected = connected !== false;
-  console.log("🗄️ Database status:", dbConnected ? "Connected" : "Fallback mode");
-});
-
-// Validate API key early
+// Validate API keys early
 if (!process.env.GEMINI_API_KEY) {
   console.error("❌ Missing GEMINI_API_KEY in environment");
   process.exit(1);
 }
 
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("❌ Missing Supabase credentials in environment");
+  process.exit(1);
+}
+
 console.log("✅ GEMINI key loaded:", !!process.env.GEMINI_API_KEY);
+console.log("✅ Supabase configured");
 console.log("🔑 API Key length:", process.env.GEMINI_API_KEY?.length || 0);
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -79,95 +74,29 @@ console.log("🤖 Using Gemini model:", MODEL_NAME);
 const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
 // Health route for testing
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
   console.log("🏥 Health check requested");
+  
+  // Test Supabase connection
+  let dbStatus = "disconnected";
+  try {
+    const { data, error } = await supabase.from('chats').select('id').limit(1);
+    if (!error) {
+      dbStatus = "connected";
+    }
+  } catch (err) {
+    console.error("Database health check error:", err);
+  }
+  
   res.json({ 
     ok: true, 
     model: MODEL_NAME,
-    database: dbConnected ? "connected" : "disconnected",
+    database: dbStatus,
     timestamp: new Date().toISOString()
   });
 });
 
-// Simple chat history test endpoint (no auth required for debugging)
-app.get("/api/chat/test", (req, res) => {
-  console.log("🧪 Chat history test requested");
-  res.json({ 
-    ok: true,
-    message: "Chat API is working",
-    database: dbConnected ? "connected" : "disconnected",
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Debug endpoint to check memory store
-app.get("/api/chat/debug", (req, res) => {
-  console.log("🔍 Debug endpoint requested");
-  try {
-    const memoryStats = {
-      totalChats: memoryStore.chats.size,
-      totalUsers: memoryStore.users.size,
-      chats: Array.from(memoryStore.chats.entries()).map(([id, chat]) => ({
-        id,
-        userId: chat.userId,
-        messageCount: chat.messages.length,
-        lastMessage: chat.messages[chat.messages.length - 1]?.text?.substring(0, 50) || 'No messages'
-      }))
-    };
-    
-    res.json({
-      ok: true,
-      memory: memoryStats,
-      database: dbConnected ? "connected" : "disconnected",
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Debug endpoint to check database chat history (no auth required for debugging)
-app.get("/api/chat/debug-db", async (req, res) => {
-  console.log("🔍 Database debug endpoint requested");
-  try {
-    if (!dbConnected) {
-      return res.json({
-        ok: false,
-        message: "Database not connected",
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    const chats = await Chat.find({}).limit(5).sort({ updatedAt: -1 });
-    const chatStats = chats.map(chat => ({
-      id: chat._id,
-      userId: chat.userId,
-      messageCount: chat.messages.length,
-      lastMessage: chat.messages[chat.messages.length - 1]?.text?.substring(0, 50) || 'No messages',
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt
-    }));
-    
-    res.json({
-      ok: true,
-      totalChats: await Chat.countDocuments(),
-      recentChats: chatStats,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Authentication routes
+// Authentication routes using Supabase Auth
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { email, password, name } = req.body;
@@ -185,62 +114,44 @@ app.post("/api/auth/register", async (req, res) => {
       });
     }
     
-    // Check if user already exists
-    let existingUser;
-    if (dbConnected) {
-      existingUser = await User.findOne({ email });
-    } else {
-      existingUser = await memoryStore.findUserByEmail(email);
-    }
+    // Register user with Supabase Auth (using admin API for server-side)
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm email
+      user_metadata: {
+        name: name
+      }
+    });
     
-    if (existingUser) {
-      return res.status(409).json({ 
-        error: "User with this email already exists" 
+    if (authError) {
+      if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
+        return res.status(409).json({ 
+          error: "User with this email already exists" 
+        });
+      }
+      return res.status(400).json({ 
+        error: "Registration failed",
+        details: authError.message 
       });
     }
     
-    // Create new user
-    let user;
-    if (dbConnected) {
-      user = new User({
-        email,
-        password,
-        name,
-        provider: 'email'
-      });
-      await user.save();
-    } else {
-      // Hash password for memory store
-      const bcrypt = await import('bcryptjs');
-      const salt = await bcrypt.default.genSalt(12);
-      const hashedPassword = await bcrypt.default.hash(password, salt);
-      
-      user = await memoryStore.createUser({
-        email,
-        password: hashedPassword,
-        name,
-        provider: 'email',
-        preferences: {
-          theme: 'dark',
-          orbTheme: 'default',
-          aiPersonality: 'friendly'
-        },
-        isEmailVerified: false,
-        lastLogin: new Date()
+    if (!authData.user) {
+      return res.status(500).json({ 
+        error: "Failed to create user" 
       });
     }
-    
-    // Generate tokens
-    const token = generateToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
     
     console.log("✅ New user registered:", email);
     
     res.status(201).json({
-      message: "User registered successfully",
-      user: dbConnected ? user.toJSON() : user,
-      token,
-      refreshToken
+      message: "User registered successfully. Please login to get your access token.",
+      user: {
+        id: authData.user.id,
+        email: authData.user.email,
+        name: name,
+        created_at: authData.user.created_at
+      }
     });
     
   } catch (err) {
@@ -263,54 +174,40 @@ app.post("/api/auth/login", async (req, res) => {
       });
     }
     
-    // Find user
-    let user;
-    if (dbConnected) {
-      user = await User.findOne({ email });
-    } else {
-      user = await memoryStore.findUserByEmail(email);
-    }
+    // Create a client for user authentication (use anon key if available, otherwise service role)
+    const { createClient } = await import("@supabase/supabase-js");
+    const authSupabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
     
-    if (!user) {
+    // Sign in with Supabase Auth
+    const { data: authData, error: authError } = await authSupabase.auth.signInWithPassword({
+      email,
+      password
+    });
+    
+    if (authError || !authData.user) {
       return res.status(401).json({ 
         error: "Invalid email or password" 
       });
     }
     
-    // Check password
-    let isPasswordValid;
-    if (dbConnected) {
-      isPasswordValid = await user.comparePassword(password);
-    } else {
-      const bcrypt = await import('bcryptjs');
-      isPasswordValid = await bcrypt.default.compare(password, user.password);
-    }
-    
-    if (!isPasswordValid) {
-      return res.status(401).json({ 
-        error: "Invalid email or password" 
-      });
-    }
-    
-    // Update last login
-    user.lastLogin = new Date();
-    if (dbConnected) {
-      await user.save();
-    } else {
-      await memoryStore.updateUser(user._id, { lastLogin: new Date() });
-    }
-    
-    // Generate tokens
-    const token = generateToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
+    // Get user metadata
+    const user = {
+      id: authData.user.id,
+      email: authData.user.email,
+      name: authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'User',
+      created_at: authData.user.created_at
+    };
     
     console.log("✅ User logged in:", email);
     
     res.json({
       message: "Login successful",
-      user: dbConnected ? user.toJSON() : user,
-      token,
-      refreshToken
+      user: user,
+      token: authData.session?.access_token,
+      refreshToken: authData.session?.refresh_token
     });
     
   } catch (err) {
@@ -332,28 +229,27 @@ app.post("/api/auth/refresh", async (req, res) => {
       });
     }
     
-    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production");
+    // Create a client for user authentication to refresh session
+    const { createClient } = await import("@supabase/supabase-js");
+    const authSupabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
     
-    if (decoded.type !== 'refresh') {
+    // Refresh session with Supabase
+    const { data, error } = await authSupabase.auth.refreshSession({
+      refresh_token: refreshToken
+    });
+    
+    if (error || !data.session) {
       return res.status(401).json({ 
         error: "Invalid refresh token" 
       });
     }
     
-    const user = await User.findById(decoded.userId).select('-password');
-    if (!user) {
-      return res.status(401).json({ 
-        error: "User not found" 
-      });
-    }
-    
-    const newToken = generateToken(user._id);
-    const newRefreshToken = generateRefreshToken(user._id);
-    
     res.json({
-      token: newToken,
-      refreshToken: newRefreshToken,
-      user: user.toJSON()
+      token: data.session.access_token,
+      refreshToken: data.session.refresh_token
     });
     
   } catch (err) {
@@ -389,11 +285,11 @@ const handleMulterError = (error, req, res, next) => {
   next(error);
 };
 
-// Main chat endpoint (now requires authentication)
+// Main chat endpoint (requires authentication)
 app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterError, async (req, res) => {
   try {
     const { message, chatId } = req.body;
-    const userId = req.user._id.toString(); // Use authenticated user ID
+    const userId = req.user.id; // Use authenticated user ID from Supabase
     
     console.log("📨 Received chat request:", { 
       userId, 
@@ -428,33 +324,51 @@ app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterE
       });
     }
     
-    // Process file information for the message (legacy format)
+    // Process file information for the message
     let fileInfo = "";
     if (uploadedFiles.length > 0) {
-      fileInfo = uploadedFiles.map(file => 
+      fileInfo = uploadedFiles.map((file) => 
         `[File: ${file.originalname} (${file.size} bytes)]`
       ).join(" ");
       console.log("📁 File info:", fileInfo);
     }
 
-    // Get conversation context for better responses
+    // Get conversation context from Supabase
     let conversationContext = "";
-    if (dbConnected) {
-      try {
-        const chat = await Chat.findOne({ userId, chatId });
-        if (chat && chat.messages.length > 0) {
-          // Get last 10 messages for context (to avoid token limits)
-          const recentMessages = chat.messages.slice(-10);
-          conversationContext = recentMessages.map(msg => 
-            `${msg.sender === 'user' ? 'User' : 'Assistant'}: ${msg.text}`
-          ).join('\n');
+    let existingChat = null;
+    try {
+      // Try to find existing chat if chatId is provided
+      if (chatId) {
+        const { data: chatData, error: chatError } = await supabase
+          .from('chats')
+          .select('id')
+          .eq('id', chatId)
+          .eq('user_id', userId)
+          .single();
+        
+        if (chatData && !chatError) {
+          existingChat = chatData;
+          
+          // Get last 10 messages for context
+          const { data: messages, error: messagesError } = await supabase
+            .from('messages')
+            .select('role, content')
+            .eq('chat_id', chatData.id)
+            .order('created_at', { ascending: true })
+            .limit(10);
+          
+          if (messages && messages.length > 0) {
+            conversationContext = messages.map(msg => 
+              `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+            ).join('\n');
+          }
         }
-      } catch (contextError) {
-        console.error("❌ Error getting conversation context:", contextError);
       }
+    } catch (contextError) {
+      console.error("❌ Error getting conversation context:", contextError);
     }
 
-    // Check if we should trigger weather search FIRST (priority over web search)
+    // Check if we should trigger weather search FIRST
     let weatherResults = null;
     let weatherLocation = null;
     let isWeatherQuery = false;
@@ -462,18 +376,16 @@ app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterE
     if (shouldTriggerWeatherSearch(message)) {
       console.log('🌤️ Message contains weather keywords, checking for weather query...');
       
-      // Extract location from the message
       weatherLocation = extractLocationFromMessage(message);
       
       if (weatherLocation) {
         console.log('🌤️ Location detected:', weatherLocation, '- fetching weather data...');
         
-        // Get weather data
         weatherResults = await getWeatherData(weatherLocation);
         
         if (weatherResults.success) {
           console.log('✅ Weather data retrieved for:', weatherLocation);
-          isWeatherQuery = true; // Mark as weather query to skip web search
+          isWeatherQuery = true;
         } else {
           console.log('⚠️ Weather data failed:', weatherResults.error);
         }
@@ -489,10 +401,7 @@ app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterE
     if (!isWeatherQuery && shouldTriggerWebSearch(message)) {
       console.log('🔍 Message contains search keywords, triggering web search...');
       
-      // Extract search query from the message
       searchQuery = message;
-      
-      // Get web search results
       webSearchResults = await getWebResults(searchQuery);
       
       if (webSearchResults.success && webSearchResults.results.length > 0) {
@@ -512,7 +421,7 @@ app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterE
       hasExternalData = true;
     }
     
-    // Add weather data if available (takes priority over web search)
+    // Add weather data if available
     if (weatherResults && weatherResults.success) {
       const weatherContext = `\n\nHere is the current weather data for ${weatherLocation}:\n${formatWeatherResults(weatherResults)}\n\nPlease use this live weather information to provide an accurate response.`;
       if (hasExternalData) {
@@ -548,118 +457,108 @@ app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterE
     const aiResponse = result.response.text();
     console.log("✅ Generated response:", aiResponse.substring(0, 50) + "...");
     
-    // Store both user message and AI response in database and/or memory store
-    let savedMessages = [];
-    const userMessageText = fileInfo ? `${message} ${fileInfo}` : message;
-    const newMessages = [
-      {
-        sender: "user",
-        text: userMessageText,
-        timestamp: new Date(),
-        files: uploadedFiles.map(file => ({
-          originalname: file.originalname,
-          filename: file.filename,
-          size: file.size,
-          mimetype: file.mimetype,
-          path: file.path
-        }))
-      },
-      {
-        sender: "ai",
-        text: aiResponse,
-        timestamp: new Date()
-      }
-    ];
+    // Store messages in Supabase
+    let savedChatId = chatId || uuidv4();
     
-    // Try to save to database first
-    if (dbConnected) {
-      try {
-        let chat = await Chat.findOne({ userId, chatId });
-        
-        if (!chat) {
-          // Generate title from the first message
-          let chatTitle = "New Chat"
-          if (message) {
-            const messageText = message.trim()
-            // Clean up the message text for title
-            let cleanText = messageText
-              .replace(/[^\w\s]/g, ' ') // Remove special characters
-              .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-              .trim()
+    try {
+      // Use existing chat or create new one
+      let chat = existingChat;
+      
+      // Create new chat if it doesn't exist
+      if (!chat) {
+        // Generate title from the first message
+        let chatTitle = "New Chat";
+        if (message) {
+          const messageText = message.trim()
+            .replace(/[^\w\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          
+          if (messageText.length <= 35) {
+            chatTitle = messageText;
+          } else {
+            const words = messageText.split(' ');
+            let titleWords = [];
+            let currentLength = 0;
             
-            if (cleanText.length <= 35) {
-              chatTitle = cleanText
-            } else {
-              // Truncate at word boundary
-              const words = cleanText.split(' ')
-              let titleWords = []
-              let currentLength = 0
-              
-              for (const word of words) {
-                if (currentLength + word.length + 1 <= 35) {
-                  titleWords.push(word)
-                  currentLength += word.length + 1
-                } else {
-                  break
-                }
-              }
-              
-              chatTitle = titleWords.join(' ')
-              if (titleWords.length < words.length) {
-                chatTitle += '...'
+            for (const word of words) {
+              if (currentLength + word.length + 1 <= 35) {
+                titleWords.push(word);
+                currentLength += word.length + 1;
+              } else {
+                break;
               }
             }
+            
+            chatTitle = titleWords.join(' ');
+            if (titleWords.length < words.length) {
+              chatTitle += '...';
+            }
           }
-          
-          // Create new chat if it doesn't exist
-          chat = new Chat({ userId, chatId, messages: [], title: chatTitle });
-          console.log("🆕 Created new chat with ID:", chatId, "and title:", chatTitle);
         }
         
-        // Add both messages
-        chat.messages.push(...newMessages);
+        const { data: newChat, error: createError } = await supabase
+          .from('chats')
+          .insert({
+            id: savedChatId,
+            user_id: userId,
+            title: chatTitle
+          })
+          .select()
+          .single();
         
-        await chat.save();
-        console.log("✅ Chat saved to database for user:", userId);
-        savedMessages = chat.messages;
+        if (createError) {
+          throw createError;
+        }
         
-      } catch (dbError) {
-        console.error("❌ Database error:", dbError);
-        // Fall through to memory store
-      }
-    }
-    
-    // Also save to memory store (as backup or primary if DB fails)
-    try {
-      let memoryChat = await memoryStore.findChatByUserId(userId, chatId);
-      
-      if (!memoryChat) {
-        // Create new chat in memory store
-        memoryChat = await memoryStore.createChat({ userId, chatId, messages: [] });
+        chat = newChat;
+        savedChatId = newChat.id;
+        console.log("🆕 Created new chat with ID:", savedChatId, "and title:", chatTitle);
       }
       
-      // Add both messages to memory store
-      memoryChat.messages.push(...newMessages);
-      await memoryStore.updateChat(memoryChat._id, { messages: memoryChat.messages });
+      // Insert user message
+      const userMessageText = fileInfo ? `${message} ${fileInfo}` : message;
+      const { error: userMsgError } = await supabase
+        .from('messages')
+        .insert({
+          chat_id: chat.id,
+          role: 'user',
+          content: userMessageText
+        });
       
-      console.log("✅ Chat saved to memory store for user:", userId);
-      
-      // If database save failed, use memory store messages
-      if (savedMessages.length === 0) {
-        savedMessages = memoryChat.messages;
+      if (userMsgError) {
+        throw userMsgError;
       }
       
-    } catch (memoryError) {
-      console.error("❌ Memory store error:", memoryError);
-    }
-    
-    if (savedMessages.length === 0) {
-      console.log("⚠️ Failed to save chat to both database and memory store");
+      // Insert AI response
+      const { error: aiMsgError } = await supabase
+        .from('messages')
+        .insert({
+          chat_id: chat.id,
+          role: 'assistant',
+          content: aiResponse
+        });
+      
+      if (aiMsgError) {
+        throw aiMsgError;
+      }
+      
+      // Update chat updated_at timestamp
+      await supabase
+        .from('chats')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', chat.id);
+      
+      console.log("✅ Messages saved to Supabase for user:", userId);
+      
+    } catch (dbError) {
+      console.error("❌ Database error saving messages:", dbError);
+      // Continue even if save fails - we still return the response
     }
     
     return res.json({ 
       reply: aiResponse,
-      messages: savedMessages,
+      chatId: savedChatId,
       webSearch: webSearchResults ? {
         triggered: true,
         query: searchQuery,
@@ -673,7 +572,6 @@ app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterE
   } catch (err) {
     console.error("❌ Chat error:", err);
     
-    // Return useful error info (but not raw api key)
     const errorResponse = {
       error: "Failed to generate response",
       details: err.message || String(err),
@@ -688,7 +586,7 @@ app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterE
 app.post("/api/chat/create", authenticateToken, async (req, res) => {
   try {
     const { chatId } = req.body;
-    const userId = req.user._id.toString();
+    const userId = req.user.id;
 
     console.log("🆕 Creating new chat:", { userId, chatId });
     
@@ -699,116 +597,75 @@ app.post("/api/chat/create", authenticateToken, async (req, res) => {
       });
     }
 
-    let savedChat = null;
+    // Check if chat already exists
+    const { data: existingChat, error: checkError } = await supabase
+      .from('chats')
+      .select('id, title')
+      .eq('id', chatId)
+      .eq('user_id', userId)
+      .single();
     
-    // Try to save to database first
-    if (dbConnected) {
-      try {
-        // Check if chat already exists
-        const existingChat = await Chat.findOne({ userId, chatId });
-        if (existingChat) {
-          console.log("📝 Chat already exists, returning existing chat");
-          return res.json({ 
-            message: "Chat already exists",
-            chat: existingChat,
-            chatId: existingChat.chatId
-          });
-        }
+    if (existingChat) {
+      console.log("📝 Chat already exists, returning existing chat");
+      return res.json({ 
+        message: "Chat already exists",
+        chat: existingChat,
+        chatId: existingChat.id
+      });
+    }
+    
+    // Generate title from message if provided
+    let chatTitle = "New Chat";
+    if (req.body.message) {
+      const messageText = req.body.message.trim()
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      if (messageText.length <= 35) {
+        chatTitle = messageText;
+      } else {
+        const words = messageText.split(' ');
+        let titleWords = [];
+        let currentLength = 0;
         
-        // Generate title from the first message if provided
-        let chatTitle = "New Chat"
-        if (req.body.message) {
-          const messageText = req.body.message.trim()
-          // Clean up the message text for title
-          let cleanText = messageText
-            .replace(/[^\w\s]/g, ' ') // Remove special characters
-            .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-            .trim()
-          
-          if (cleanText.length <= 35) {
-            chatTitle = cleanText
+        for (const word of words) {
+          if (currentLength + word.length + 1 <= 35) {
+            titleWords.push(word);
+            currentLength += word.length + 1;
           } else {
-            // Truncate at word boundary
-            const words = cleanText.split(' ')
-            let titleWords = []
-            let currentLength = 0
-            
-            for (const word of words) {
-              if (currentLength + word.length + 1 <= 35) {
-                titleWords.push(word)
-                currentLength += word.length + 1
-              } else {
-                break
-              }
-            }
-            
-            chatTitle = titleWords.join(' ')
-            if (titleWords.length < words.length) {
-              chatTitle += '...'
-            }
+            break;
           }
         }
         
-        // Create new chat
-        const newChat = new Chat({ 
-          userId, 
-          chatId, 
-          messages: [],
-          title: chatTitle
-        });
-        
-        savedChat = await newChat.save();
-        console.log("✅ New chat created in database:", savedChat.chatId);
-        
-      } catch (dbError) {
-        console.error("❌ Database error:", dbError);
-        // Fall through to memory store
+        chatTitle = titleWords.join(' ');
+        if (titleWords.length < words.length) {
+          chatTitle += '...';
+        }
       }
     }
     
-    // Also save to memory store (as backup or primary if DB fails)
-    try {
-      // Check if chat already exists in memory
-      const existingMemoryChat = await memoryStore.findChatByUserId(userId, chatId);
-      if (existingMemoryChat) {
-        console.log("📝 Chat already exists in memory, returning existing chat");
-        return res.json({ 
-          message: "Chat already exists",
-          chat: existingMemoryChat,
-          chatId: existingMemoryChat.chatId
-        });
-      }
-      
-      // Create new chat in memory store
-      const newMemoryChat = await memoryStore.createChat({ 
-        userId, 
-        chatId, 
-        messages: [],
+    // Create new chat
+    const { data: newChat, error: createError } = await supabase
+      .from('chats')
+      .insert({
+        id: chatId,
+        user_id: userId,
         title: chatTitle
-      });
-      
-      console.log("✅ New chat created in memory store:", newMemoryChat.chatId);
-      
-      // If database save failed, use memory store chat
-      if (!savedChat) {
-        savedChat = newMemoryChat;
-      }
-      
-    } catch (memoryError) {
-      console.error("❌ Memory store error:", memoryError);
+      })
+      .select()
+      .single();
+    
+    if (createError) {
+      throw createError;
     }
     
-    if (!savedChat) {
-      console.log("⚠️ Failed to create chat in both database and memory store");
-      return res.status(500).json({ 
-        error: "Failed to create chat" 
-      });
-    }
+    console.log("✅ New chat created:", newChat.id);
     
     return res.json({ 
       message: "Chat created successfully",
-      chat: savedChat,
-      chatId: savedChat.chatId
+      chat: newChat,
+      chatId: newChat.id
     });
     
   } catch (err) {
@@ -823,65 +680,69 @@ app.post("/api/chat/create", authenticateToken, async (req, res) => {
 // Get chat history for a user (requires authentication)
 app.get("/api/chat/history", authenticateToken, async (req, res) => {
   try {
-    const userId = req.user._id.toString();
+    const userId = req.user.id;
 
     console.log("📖 Fetching chat history for user:", userId);
     
+    // Get all chats for user
+    const { data: chats, error: chatsError } = await supabase
+      .from('chats')
+      .select('id, title, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+    
+    if (chatsError) {
+      throw chatsError;
+    }
+    
+    // Get all messages for user's chats
     let allMessages = [];
     let allChats = [];
     
-    if (dbConnected) {
-      // Try to get from MongoDB first
-      try {
-        const chats = await Chat.find({ userId }).sort({ updatedAt: -1 });
-        
-        if (chats.length > 0) {
-          console.log("✅ Found", chats.length, "chats in MongoDB for user:", userId);
-          allChats = chats.map(chat => chat.toObject());
-          // Combine all messages from all chats
-          allMessages = chats.reduce((acc, chat) => {
-            return acc.concat(chat.messages.map(msg => ({
-              ...msg.toObject(),
-              chatId: chat.chatId,
-              chatTitle: chat.title
-            })));
-          }, []);
-        } else {
-          console.log("📭 No chat history found in MongoDB for user:", userId);
-        }
-      } catch (dbError) {
-        console.error("❌ Database error:", dbError);
-        // Fall through to in-memory store
+    if (chats && chats.length > 0) {
+      const chatIds = chats.map(chat => chat.id);
+      
+      const { data: messages, error: messagesError } = await supabase
+        .from('messages')
+        .select('id, chat_id, role, content, created_at')
+        .in('chat_id', chatIds)
+        .order('created_at', { ascending: true });
+      
+      if (messagesError) {
+        throw messagesError;
       }
+      
+      // Format messages to match expected structure
+      allMessages = (messages || []).map(msg => ({
+        id: msg.id,
+        chatId: msg.chat_id,
+        sender: msg.role === 'user' ? 'user' : 'ai',
+        text: msg.content,
+        timestamp: msg.created_at
+      }));
+      
+      // Format chats to match expected structure
+      allChats = (chats || []).map(chat => ({
+        chatId: chat.id,
+        userId: userId,
+        title: chat.title,
+        messages: (messages || []).filter(msg => msg.chat_id === chat.id).map(msg => ({
+          sender: msg.role === 'user' ? 'user' : 'ai',
+          text: msg.content,
+          timestamp: msg.created_at
+        })),
+        createdAt: chat.created_at,
+        updatedAt: chat.updated_at
+      }));
     }
     
-    // If no chats from database, try in-memory store
-    if (allChats.length === 0) {
-      try {
-        const memoryChats = Array.from(memoryStore.chats.values()).filter(chat => chat.userId === userId);
-        if (memoryChats.length > 0) {
-          console.log("✅ Found", memoryChats.length, "chats in memory store for user:", userId);
-          allChats = memoryChats;
-          allMessages = memoryChats.reduce((acc, chat) => {
-            return acc.concat(chat.messages.map(msg => ({
-              ...msg,
-              chatId: chat.chatId,
-              chatTitle: chat.title
-            })));
-          }, []);
-        } else {
-          console.log("📭 No chat history found in memory store for user:", userId);
-        }
-      } catch (memoryError) {
-        console.error("❌ Memory store error:", memoryError);
-      }
-    }
+    console.log("✅ Found", allChats.length, "chats for user:", userId);
     
     return res.json({ 
       messages: allMessages,
       chats: allChats,
       userId,
-      source: dbConnected ? "database" : "memory",
+      source: "supabase",
       message: allMessages.length > 0 ? "Chat history loaded successfully" : "No chat history found"
     });
     
@@ -889,6 +750,41 @@ app.get("/api/chat/history", authenticateToken, async (req, res) => {
     console.error("❌ Error fetching chat history:", err);
     return res.status(500).json({ 
       error: "Failed to fetch chat history",
+      details: err.message || String(err)
+    });
+  }
+});
+
+// Delete a specific chat (requires authentication)
+app.delete("/api/chat/:chatId", authenticateToken, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+
+    console.log("🗑️ Deleting chat:", { userId, chatId });
+    
+    // Delete chat (messages will be cascade deleted)
+    const { error: deleteError } = await supabase
+      .from('chats')
+      .delete()
+      .eq('id', chatId)
+      .eq('user_id', userId);
+    
+    if (deleteError) {
+      throw deleteError;
+    }
+    
+    console.log("✅ Chat deleted:", chatId);
+    
+    return res.json({ 
+      message: "Chat deleted successfully",
+      chatId
+    });
+    
+  } catch (err) {
+    console.error("❌ Error deleting chat:", err);
+    return res.status(500).json({ 
+      error: "Failed to delete chat",
       details: err.message || String(err)
     });
   }
@@ -935,127 +831,6 @@ app.post("/api/search", authenticateToken, async (req, res) => {
   }
 });
 
-// Delete a specific chat (requires authentication)
-app.delete("/api/chat/:chatId", authenticateToken, async (req, res) => {
-  try {
-    const { chatId } = req.params;
-    const userId = req.user._id.toString();
-
-    console.log("🗑️ Deleting chat:", { userId, chatId });
-    
-    let deletedFromDatabase = false;
-    let deletedFromMemory = false;
-    
-    // Try to delete from database
-    if (dbConnected) {
-      try {
-        const result = await Chat.deleteOne({ userId, chatId });
-        if (result.deletedCount > 0) {
-          console.log("✅ Chat deleted from database:", chatId);
-          deletedFromDatabase = true;
-        }
-      } catch (dbError) {
-        console.error("❌ Database error:", dbError);
-      }
-    }
-    
-    // Try to delete from memory store
-    try {
-      const result = await memoryStore.deleteChatByUserIdAndChatId(userId, chatId);
-      if (result.deletedCount > 0) {
-        console.log("✅ Chat deleted from memory store:", chatId);
-        deletedFromMemory = true;
-      }
-    } catch (memoryError) {
-      console.error("❌ Memory store error:", memoryError);
-    }
-    
-    if (!deletedFromDatabase && !deletedFromMemory) {
-      console.log("📭 Chat not found for deletion:", chatId);
-      return res.status(404).json({ 
-        error: "Chat not found",
-        chatId
-      });
-    }
-    
-    return res.json({ 
-      message: "Chat deleted successfully",
-      chatId,
-      deletedFrom: {
-        database: deletedFromDatabase,
-        memory: deletedFromMemory
-      }
-    });
-    
-  } catch (err) {
-    console.error("❌ Error deleting chat:", err);
-    return res.status(500).json({ 
-      error: "Failed to delete chat",
-      details: err.message || String(err)
-    });
-  }
-});
-
-// Clear chat history for a user (requires authentication)
-app.delete("/api/chat/history", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user._id.toString();
-
-    console.log("🗑️ Clearing chat history for user:", userId);
-    
-    let clearedFromDatabase = false;
-    let clearedFromMemory = false;
-    
-    // Try to clear from database
-    if (dbConnected) {
-      try {
-        const result = await Chat.deleteOne({ userId });
-        if (result.deletedCount > 0) {
-          console.log("✅ Chat history cleared from database for user:", userId);
-          clearedFromDatabase = true;
-        }
-      } catch (dbError) {
-        console.error("❌ Database error:", dbError);
-      }
-    }
-    
-    // Try to clear from memory store
-    try {
-      const result = await memoryStore.deleteChatByUserId(userId);
-      if (result.deletedCount > 0) {
-        console.log("✅ Chat history cleared from memory store for user:", userId);
-        clearedFromMemory = true;
-      }
-    } catch (memoryError) {
-      console.error("❌ Memory store error:", memoryError);
-    }
-    
-    if (!clearedFromDatabase && !clearedFromMemory) {
-      console.log("📭 No chat history found to delete for user:", userId);
-      return res.json({ 
-        message: "No chat history found to delete",
-        userId
-      });
-    }
-    
-    return res.json({ 
-      message: "Chat history cleared successfully",
-      userId,
-      clearedFrom: {
-        database: clearedFromDatabase,
-        memory: clearedFromMemory
-      }
-    });
-    
-  } catch (err) {
-    console.error("❌ Error clearing chat history:", err);
-    return res.status(500).json({ 
-      error: "Failed to clear chat history",
-      details: err.message || String(err)
-    });
-  }
-});
-
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("❌ Server error:", err);
@@ -1077,6 +852,6 @@ app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
   console.log(`💬 Chat endpoint: http://localhost:${PORT}/api/chat`);
-  console.log(`📖 Get chat history: http://localhost:${PORT}/api/chat/:userId`);
-  console.log(`🗑️ Clear chat history: http://localhost:${PORT}/api/chat/:userId`);
+  console.log(`📖 Get chat history: http://localhost:${PORT}/api/chat/history`);
 });
+

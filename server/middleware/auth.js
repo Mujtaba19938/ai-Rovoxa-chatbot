@@ -1,82 +1,53 @@
-import jwt from "jsonwebtoken";
-import User from "../models/User.js";
-import memoryStore from "../utils/memory-store.js";
+/**
+ * Supabase Authentication Middleware
+ * Uses Supabase Auth to verify user tokens
+ */
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
-
+import { supabase } from "../lib/supabase.js";
 export const authenticateToken = async (req, res, next) => {
   try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const authHeader = req.headers.authorization;
 
-    if (!token) {
-      return res.status(401).json({ 
+    if (!authHeader) {
+      return res.status(401).json({
         error: "Access token required",
         code: "NO_TOKEN"
       });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    
-    // Get user from database or memory store
-    let user;
-    try {
-      // Try MongoDB first
-      user = await User.findById(decoded.userId).select('-password');
-    } catch (error) {
-      // Fallback to memory store
-      user = await memoryStore.findUserById(decoded.userId);
-      if (user) {
-        // Remove password from memory store user
-        const { password, ...userWithoutPassword } = user;
-        user = userWithoutPassword;
-      }
-    }
-    
-    if (!user) {
-      return res.status(401).json({ 
-        error: "Invalid token - user not found",
-        code: "USER_NOT_FOUND"
+    const token = authHeader.replace("Bearer ", "");
+
+    if (!token) {
+      return res.status(401).json({
+        error: "Invalid authorization header format",
+        code: "INVALID_HEADER"
       });
     }
 
-    req.user = user;
-    next();
-  } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ 
-        error: "Invalid token",
+    // Verify token with Supabase
+    const { data, error } = await supabase.auth.getUser(token);
+
+    if (error || !data.user) {
+      return res.status(401).json({
+        error: "Invalid or expired token",
         code: "INVALID_TOKEN"
       });
     }
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
-        error: "Token expired",
-        code: "TOKEN_EXPIRED"
-      });
-    }
 
+    // Attach user to request
+    req.user = {
+      id: data.user.id,
+      email: data.user.email,
+      ...data.user
+    };
+
+    next();
+  } catch (error) {
     console.error("Auth middleware error:", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "Authentication error",
       code: "AUTH_ERROR"
     });
   }
 };
 
-export const generateToken = (userId) => {
-  return jwt.sign(
-    { userId },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
-};
-
-export const generateRefreshToken = (userId) => {
-  return jwt.sign(
-    { userId, type: 'refresh' },
-    JWT_SECRET,
-    { expiresIn: '30d' }
-  );
-};
