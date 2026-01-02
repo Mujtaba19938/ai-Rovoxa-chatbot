@@ -150,16 +150,17 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="min-h-screen bg-gradient-to-br from-background via-background to-background flex items-center justify-center p-4"
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: "var(--bg-primary)" }}
     >
-      <Card className="w-full max-w-md bg-card/80 border-border/30 backdrop-blur-xl shadow-2xl shadow-black/50 ring-1 ring-border/50">
+      <Card className="w-full max-w-[420px] rovoxa-glass-card rovoxa-shadow-glass">
         <CardHeader className="text-center space-y-3 pb-6">
-          <CardTitle className="text-3xl font-bold text-foreground">
+          <CardTitle className="text-3xl font-bold rovoxa-text-primary">
             {isLogin ? "Welcome back" : "Create account"}
           </CardTitle>
-          <CardDescription className="text-muted-foreground text-base leading-relaxed">
+          <CardDescription className="rovoxa-text-secondary text-base leading-relaxed">
             {isLogin 
-              ? "Sign in to continue to AI Orb Chat" 
+              ? "Sign in to continue to Rovoxa" 
               : "You'll get smarter responses and can upload files, images, and more."
             }
           </CardDescription>
@@ -170,7 +171,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
           <div className="space-y-3">
             <Button
               variant="outline"
-              className="w-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full rovoxa-bg-glass-soft border-border-glass rovoxa-text-primary hover:bg-glass hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
               disabled={isLoading}
             >
               <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
@@ -184,7 +185,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
             
             <Button
               variant="outline"
-              className="w-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full rovoxa-bg-glass-soft border-border-glass rovoxa-text-primary hover:bg-glass hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
               disabled={isLoading}
             >
               <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24" fill="currentColor">
@@ -195,7 +196,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
             
             <Button
               variant="outline"
-              className="w-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full rovoxa-bg-glass-soft border-border-glass rovoxa-text-primary hover:bg-glass hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
               disabled={isLoading}
             >
               <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
@@ -209,7 +210,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
             
             <Button
               variant="outline"
-              className="w-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full rovoxa-bg-glass-soft border-border-glass rovoxa-text-primary hover:bg-glass hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
               disabled={isLoading}
             >
               <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24" fill="currentColor">
@@ -224,7 +225,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
               <Separator className="w-full" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or</span>
+              <span className="rovoxa-bg-primary px-2 rovoxa-text-secondary">Or</span>
             </div>
           </div>
           
@@ -232,9 +233,9 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-foreground">Name</Label>
+                <Label htmlFor="name" className="rovoxa-text-primary">Name</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <User className="absolute left-3 top-3 h-4 w-4 rovoxa-text-secondary" />
                   <Input
                     id="name"
                     type="text"
@@ -242,22 +243,22 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
                     value={formData.name}
                     onChange={(e) => handleInputChange("name", e.target.value)}
                     className={cn(
-                      "pl-10 shadow-sm hover:shadow-md transition-all duration-200",
-                      errors.name && "border-destructive focus:border-destructive focus:ring-destructive/20"
+                      "pl-10 rovoxa-glass-input",
+                      errors.name && "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                     )}
                     disabled={isLoading}
                   />
                 </div>
                 {errors.name && (
-                  <p className="text-sm text-destructive">{errors.name}</p>
+                  <p className="text-sm text-red-400">{errors.name}</p>
                 )}
               </div>
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground">Email address</Label>
+              <Label htmlFor="email" className="rovoxa-text-primary">Email address</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Mail className="absolute left-3 top-3 h-4 w-4 rovoxa-text-secondary" />
                 <Input
                   id="email"
                   type="email"
@@ -265,21 +266,21 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   className={cn(
-                    "pl-10 shadow-sm hover:shadow-md transition-all duration-200",
-                    errors.email && "border-destructive focus:border-destructive focus:ring-destructive/20"
+                    "pl-10 rovoxa-glass-input",
+                    errors.email && "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                   )}
                   disabled={isLoading}
                 />
               </div>
               {errors.email && (
-                <p className="text-sm text-destructive">{errors.email}</p>
+                <p className="text-sm text-red-400">{errors.email}</p>
               )}
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground">Password</Label>
+              <Label htmlFor="password" className="rovoxa-text-primary">Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Lock className="absolute left-3 top-3 h-4 w-4 rovoxa-text-secondary" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -287,27 +288,27 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
                   value={formData.password}
                   onChange={(e) => handleInputChange("password", e.target.value)}
                   className={cn(
-                    "pl-10 pr-10 shadow-sm hover:shadow-md transition-all duration-200",
-                    errors.password && "border-destructive focus:border-destructive focus:ring-destructive/20"
+                    "pl-10 pr-10 rovoxa-glass-input",
+                    errors.password && "border-red-500 focus:border-red-500 focus:ring-red-500/20"
                   )}
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-3 rovoxa-text-secondary hover:rovoxa-text-primary"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {errors.password && (
-                <p className="text-sm text-destructive">{errors.password}</p>
+                <p className="text-sm text-red-400">{errors.password}</p>
               )}
             </div>
             
             <Button
               type="submit"
-              className="w-full font-semibold py-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rovoxa-btn-accent py-3"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -357,7 +358,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess, onError }) => {
           <div className="text-center pt-2">
             <button
               onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors duration-200 hover:underline"
+              className="text-sm rovoxa-text-secondary hover:rovoxa-accent-green transition-colors duration-200 hover:underline"
               disabled={isLoading}
             >
               {isLogin 

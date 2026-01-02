@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import Rovoxa Theme */
+@import '../styles/rovoxa-theme.css';
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

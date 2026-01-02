@@ -1,0 +1,163 @@
+/**
+ * Rovoxa Theme System
+ * Global theme tokens matching the Rovoxa landing page design
+ */
+
+:root {
+  /* Background Gradients */
+  --bg-primary: radial-gradient(
+    1200px at top left,
+    #0b0f19 0%,
+    #0a0d14 45%,
+    #07090f 100%
+  );
+
+  /* Glass Morphism */
+  --bg-glass: rgba(15, 17, 21, 0.6);
+  --border-glass: rgba(255, 255, 255, 0.08);
+
+  /* Text Colors */
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.65);
+
+  /* Accent Colors */
+  --accent-green: #c7f000;
+  --accent-green-soft: rgba(199, 240, 0, 0.15);
+  --accent-green-glow: rgba(199, 240, 0, 0.3);
+
+  /* Blur Effects */
+  --blur-strong: blur(18px);
+  --blur-soft: blur(12px);
+
+  /* Shadows */
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --shadow-glow: 0 0 20px rgba(199, 240, 0, 0.2);
+
+  /* Border Radius */
+  --radius-glass: 16px;
+  --radius-pill: 9999px;
+
+  /* Transitions */
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Utility Classes */
+.rovoxa-bg-primary {
+  background: var(--bg-primary);
+}
+
+.rovoxa-bg-glass {
+  background: var(--bg-glass);
+  backdrop-filter: var(--blur-strong);
+  -webkit-backdrop-filter: var(--blur-strong);
+  border: 1px solid var(--border-glass);
+}
+
+.rovoxa-bg-glass-soft {
+  background: var(--bg-glass);
+  backdrop-filter: var(--blur-soft);
+  -webkit-backdrop-filter: var(--blur-soft);
+  border: 1px solid var(--border-glass);
+}
+
+.rovoxa-text-primary {
+  color: var(--text-primary);
+}
+
+.rovoxa-text-secondary {
+  color: var(--text-secondary);
+}
+
+.rovoxa-accent-green {
+  color: var(--accent-green);
+}
+
+.rovoxa-bg-accent-green {
+  background-color: var(--accent-green);
+}
+
+.rovoxa-bg-accent-green-soft {
+  background-color: var(--accent-green-soft);
+}
+
+.rovoxa-glow-green {
+  box-shadow: var(--shadow-glow);
+}
+
+.rovoxa-shadow-glass {
+  box-shadow: var(--shadow-glass);
+}
+
+/* Glass Card */
+.rovoxa-glass-card {
+  background: var(--bg-glass);
+  backdrop-filter: var(--blur-strong);
+  -webkit-backdrop-filter: var(--blur-strong);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-glass);
+  box-shadow: var(--shadow-glass);
+}
+
+/* Glass Input */
+.rovoxa-glass-input {
+  background: rgba(15, 17, 21, 0.4);
+  backdrop-filter: var(--blur-soft);
+  -webkit-backdrop-filter: var(--blur-soft);
+  border: 1px solid var(--border-glass);
+  color: var(--text-primary);
+  transition: var(--transition-smooth);
+}
+
+.rovoxa-glass-input:focus {
+  outline: none;
+  border-color: var(--accent-green);
+  box-shadow: 0 0 0 3px var(--accent-green-soft);
+  background: rgba(15, 17, 21, 0.6);
+}
+
+.rovoxa-glass-input::placeholder {
+  color: var(--text-secondary);
+}
+
+/* Accent Button */
+.rovoxa-btn-accent {
+  background-color: var(--accent-green);
+  color: #0b0f19;
+  border: none;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  transition: var(--transition-smooth);
+  box-shadow: 0 4px 12px rgba(199, 240, 0, 0.2);
+}
+
+.rovoxa-btn-accent:hover {
+  background-color: #d4ff1a;
+  box-shadow: 0 6px 20px rgba(199, 240, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.rovoxa-btn-accent:active {
+  transform: translateY(0);
+}
+
+.rovoxa-btn-accent:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Logo Glow Effect */
+.rovoxa-logo-glow {
+  filter: drop-shadow(0 0 10px var(--accent-green-glow));
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px var(--accent-green-glow));
+  }
+  50% {
+    filter: drop-shadow(0 0 20px var(--accent-green-glow));
+  }
+}
+

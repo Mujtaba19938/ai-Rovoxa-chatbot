@@ -224,7 +224,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            className="fixed inset-0 z-40 lg:hidden"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
             onClick={onToggle}
           />
         )}
@@ -239,17 +240,19 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
         className={cn(
-          "fixed left-0 top-0 h-full bg-background border-r border-border z-50 flex flex-col",
+          "fixed left-0 top-0 h-full z-50 flex flex-col",
           "lg:relative lg:z-auto w-[280px]"
         )}
+        style={{ background: "var(--bg-primary)", borderRight: "1px solid var(--border-glass)" }}
       >
         {/* Header */}
-        <div className="p-4 border-b border-border flex items-center justify-between">
+        <div className="p-4 border-b border-border-glass flex items-center justify-between">
           <div className="flex items-center space-x-3 min-w-0 flex-1">
             <div className="w-8 h-8 flex items-center justify-center shrink-0">
               <SafeOrbWrapper orbSize={1.5} animationState="idle" />
             </div>
-            <h1 className="text-lg font-semibold text-foreground truncate">AI Orb Chat</h1>
+            <h1 className="text-lg font-semibold rovoxa-text-primary truncate">Rovoxa</h1>
+            <div className="w-2 h-2 rounded-full bg-[#c7f000]"></div>
           </div>
           
           <div className="flex items-center space-x-2 shrink-0">
@@ -257,7 +260,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="hidden lg:flex text-muted-foreground hover:text-foreground"
+              className="hidden lg:flex rovoxa-text-secondary hover:rovoxa-text-primary"
             >
               <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "rotate-180")} />
             </Button>
@@ -266,14 +269,14 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
               variant="ghost"
               size="icon"
               onClick={onToggle}
-              className="lg:hidden text-muted-foreground hover:text-foreground"
+              className="lg:hidden rovoxa-text-secondary hover:rovoxa-text-primary"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        <Separator className="bg-border" />
+        <Separator className="bg-border-glass" />
 
         {/* New Chat Section */}
         <div className="p-4 pb-2">
@@ -289,8 +292,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     height="20" 
                     viewBox="0 0 24 24" 
                     fill="none" 
-                    className="text-primary drop-shadow-lg"
-                    style={{ filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.3))' }}
+                    style={{ color: 'var(--accent-green)', filter: 'drop-shadow(0 0 8px rgba(199, 240, 0, 0.3))' }}
                   >
                     <path 
                       d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4" 
@@ -309,7 +311,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 </div>
               </div>
               <span 
-                className="text-foreground font-medium text-sm tracking-wide"
+                className="rovoxa-text-primary font-medium text-sm tracking-wide"
               >
                 New chat
               </span>
@@ -317,16 +319,16 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           </div>
         </div>
 
-        <Separator className="bg-border" />
+        <Separator className="bg-border-glass" />
 
         {/* Chat History Section */}
         <div className="flex-1 overflow-hidden">
           <div className="p-4 pb-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              <h2 className="text-sm font-medium rovoxa-text-secondary uppercase tracking-wide">
                 Chats
               </h2>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 rovoxa-text-secondary" />
             </div>
           </div>
 
@@ -338,34 +340,34 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 <div className="space-y-1">
                   {Array.from({ length: 3 }).map((_, index) => (
                     <div key={index} className="p-3 rounded-lg">
-                      <Skeleton className="h-4 w-3/4 mb-2 bg-muted" />
-                      <Skeleton className="h-3 w-1/2 mb-1 bg-muted" />
-                      <Skeleton className="h-3 w-1/4 bg-muted" />
+                      <Skeleton className="h-4 w-3/4 mb-2" style={{ backgroundColor: 'var(--bg-glass)' }} />
+                      <Skeleton className="h-3 w-1/2 mb-1" style={{ backgroundColor: 'var(--bg-glass)' }} />
+                      <Skeleton className="h-3 w-1/4" style={{ backgroundColor: 'var(--bg-glass)' }} />
                     </div>
                   ))}
                   <div className="p-2 text-center">
-                    <p className="text-xs text-muted-foreground">Loading chat history...</p>
+                    <p className="text-xs rovoxa-text-secondary">Loading chat history...</p>
                   </div>
                 </div>
               ) : chatHistory.length === 0 ? (
-                <div className="p-4 text-center text-muted-foreground">
-                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <div className="p-4 text-center rovoxa-text-secondary">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" style={{ color: 'var(--text-secondary)' }} />
                   {historyError ? (
                     <>
-                      <p className="text-sm text-destructive mb-2">Failed to load chat history</p>
-                      <p className="text-xs text-muted-foreground/70 mb-3">{historyError}</p>
+                      <p className="text-sm text-red-400 mb-2">Failed to load chat history</p>
+                      <p className="text-xs rovoxa-text-secondary mb-3">{historyError}</p>
                       {historyError.includes('Server not running') && (
-                        <div className="text-xs text-muted-foreground/70 mb-3 p-2 bg-muted/50 rounded">
+                        <div className="text-xs rovoxa-text-secondary mb-3 p-2 rovoxa-bg-glass-soft rounded border border-border-glass">
                           <p>💡 To fix this:</p>
                           <p>1. Open a terminal</p>
-                          <p>2. Run: <code className="bg-background px-1 rounded">npm run server</code></p>
+                          <p>2. Run: <code className="rovoxa-bg-primary px-1 rounded">npm run server</code></p>
                         </div>
                       )}
                     </>
                   ) : (
                     <>
-                      <p className="text-sm">No previous chats</p>
-                      <p className="text-xs text-muted-foreground/70">Your conversations will appear here</p>
+                      <p className="text-sm rovoxa-text-primary">No previous chats</p>
+                      <p className="text-xs rovoxa-text-secondary">Your conversations will appear here</p>
                     </>
                   )}
                   <button 
@@ -373,7 +375,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                       setForceStopLoading(false)
                       retryFetchChatHistory()
                     }}
-                    className="mt-2 text-xs text-primary hover:underline"
+                    className="mt-2 text-xs rovoxa-accent-green hover:underline"
                   >
                     {historyError ? 'Retry loading' : 'Refresh'}
                   </button>
@@ -386,18 +388,20 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     whileTap={{ scale: 0.99 }}
                     className={cn(
                       "group relative p-2 rounded-lg cursor-pointer transition-all duration-200",
-                      "hover:bg-muted/50 border border-transparent",
-                      currentChatId === chat.id && "bg-muted/70 border-border"
+                      "border border-transparent",
+                      currentChatId === chat.id 
+                        ? "rovoxa-bg-glass-soft border-border-glass" 
+                        : "hover:rovoxa-bg-glass-soft"
                     )}
                     onClick={() => onSelectChat(chat.id)}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium text-foreground leading-tight break-words">
+                        <h3 className="text-sm font-medium rovoxa-text-primary leading-tight break-words">
                           {chat.title}
                         </h3>
                         <div className="mt-1">
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs rovoxa-text-secondary">
                             {formatTimestamp(chat.timestamp)}
                           </span>
                         </div>
@@ -408,7 +412,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 text-muted-foreground hover:text-foreground shrink-0"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 rovoxa-text-secondary hover:rovoxa-text-primary shrink-0"
                             onClick={(e) => {
                               e.stopPropagation()
                             }}
@@ -422,7 +426,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                               e.stopPropagation()
                               handleDeleteChat(chat.id)
                             }}
-                            className="text-destructive focus:text-destructive"
+                            className="text-red-400 focus:text-red-400"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Delete Chat
@@ -438,18 +442,18 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         </div>
 
         {/* User Section */}
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border-glass">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-              <span className="text-sm font-medium text-primary-foreground">
+            <div className="w-8 h-8 rounded-full rovoxa-bg-glass-soft flex items-center justify-center shrink-0 border border-border-glass">
+              <span className="text-sm font-medium rovoxa-text-primary">
                 {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">
+              <p className="text-sm font-medium rovoxa-text-primary truncate">
                 {user?.name || 'User'}
               </p>
-              <p className="text-xs text-muted-foreground truncate">
+              <p className="text-xs rovoxa-text-secondary truncate">
                 {user?.email}
               </p>
             </div>
@@ -457,7 +461,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
               variant="ghost"
               size="icon"
               onClick={logout}
-              className="text-muted-foreground hover:text-destructive shrink-0"
+              className="rovoxa-text-secondary hover:text-red-400 shrink-0"
             >
               <LogOut className="h-4 w-4" />
             </Button>
