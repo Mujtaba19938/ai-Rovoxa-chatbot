@@ -27,13 +27,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, fallback }) => {
     if (isAuthenticated && !isLoading && !hasShownSplash) {
       setShowSplash(true)
       setHasShownSplash(true)
-      
-      // Auto-hide splash screen after 3 seconds if user doesn't interact
-      const timer = setTimeout(() => {
-        setShowSplash(false)
-      }, 3000)
-      
-      return () => clearTimeout(timer)
     }
   }, [isAuthenticated, isLoading, hasShownSplash])
 

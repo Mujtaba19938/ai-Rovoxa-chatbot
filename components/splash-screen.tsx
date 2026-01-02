@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-
+import React from "react"
 import { motion } from "framer-motion"
 
 interface SplashScreenProps {
@@ -9,14 +8,24 @@ interface SplashScreenProps {
 }
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ onEnterChat }) => {
+  // Auto-transition after 2 seconds
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      onEnterChat()
+    }, 2000)
+    
+    return () => clearTimeout(timer)
+  }, [onEnterChat])
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.8, ease: "easeInOut" }}
-      className="fixed inset-0 rovoxa-bg-primary flex flex-col items-center justify-center overflow-hidden"
+      className="fixed inset-0 rovoxa-bg-primary flex flex-col items-center justify-center overflow-hidden cursor-pointer"
       style={{ background: "var(--bg-primary)" }}
+      onClick={onEnterChat}
     >
       {/* Centered Logo + App Name */}
       <motion.div
