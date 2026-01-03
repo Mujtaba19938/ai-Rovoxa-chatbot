@@ -54,7 +54,8 @@ const ChatUIWithHistory: React.FC = () => {
   const { 
     messages: aiMessages, 
     input, 
-    handleInputChange, 
+    handleInputChange: originalHandleInputChange,
+    setInput,
     handleSubmit: originalHandleSubmit, 
     isLoading, 
     error, 
@@ -80,6 +81,13 @@ const ChatUIWithHistory: React.FC = () => {
       toast.error("Failed to get AI response. Please try again.");
     }
   })
+
+  // Wrapper to ensure input is always trimmed
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    // Don't trim while typing (allows spaces), but we'll validate on submit
+    originalHandleInputChange(e);
+  }
 
   // ============================================
   // FIX 5: FIX SEND MESSAGE FLOW (NO EMPTY MESSAGES)
@@ -164,11 +172,39 @@ const ChatUIWithHistory: React.FC = () => {
       }
     } else {
       // No files attached, use the original submit handler
-      // But ensure we're sending a valid message
-      if (trimmed) {
-        originalHandleSubmit(e);
+      // CRITICAL FIX: The useChat hook reads 'input' state at submit time
+      // We must update the input state to trimmed value BEFORE calling originalHandleSubmit
+      if (trimmed && trimmed.length > 0) {
+        // Update the hook's input state to the trimmed value
+        // This is critical - the hook will use this value when submitting
+        setInput(trimmed);
+        
+        // Clear the input field in the DOM to prevent visual confusion
+        const inputElement = e.currentTarget?.querySelector('input[type="text"], textarea') as HTMLInputElement | HTMLTextAreaElement;
+        if (inputElement) {
+          inputElement.value = '';
+        }
+        
+        // Use requestAnimationFrame to ensure React state update is processed
+        // This ensures the useChat hook sees the updated (trimmed) input value
+        requestAnimationFrame(() => {
+          // Create a new synthetic event for the submit
+          const syntheticEvent = {
+            ...e,
+            preventDefault: () => {},
+            stopPropagation: () => {},
+          } as React.FormEvent;
+          
+          // Call original submit handler - it will now use the trimmed input from state
+          originalHandleSubmit(syntheticEvent);
+        });
+        
         // Reset web search loading after a delay
         setTimeout(() => setIsWebSearching(false), 2000);
+      } else {
+        console.warn("⚠️ Message validation failed - trimmed message is empty");
+        // Clear input if it's just whitespace
+        setInput('');
       }
     }
   }
