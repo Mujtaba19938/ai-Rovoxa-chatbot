@@ -184,30 +184,18 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     }
   }, [historyChats, historyMessages, isLoadingHistory, forceStopLoading])
 
-  const formatTimestamp = (date: Date | string | number) => {
-    // Debug logging to see what we're receiving
-    console.log('formatTimestamp received:', date, 'type:', typeof date)
-    
-    // Convert to Date object if it's not already
-    let dateObj: Date
-    if (date instanceof Date) {
-      dateObj = date
-    } else if (typeof date === 'string' || typeof date === 'number') {
-      dateObj = new Date(date)
-    } else {
-      // Fallback to current date if invalid
-      console.warn('Invalid date format, using current date:', date)
-      dateObj = new Date()
-    }
-    
-    // Check if the date is valid
-    if (isNaN(dateObj.getTime())) {
-      console.warn('Invalid date object, returning Unknown:', dateObj)
-      return 'Unknown'
-    }
-    
+  // ============================================
+  // FIX 4: FIX TIMESTAMP FORMATTER (INVALID DATE BUG)
+  // ============================================
+  const formatTimestamp = (input?: string | number | Date) => {
+    if (!input) return "Unknown"
+
+    const date = input instanceof Date ? input : new Date(input)
+
+    if (isNaN(date.getTime())) return "Unknown"
+
     const now = new Date()
-    const diff = now.getTime() - dateObj.getTime()
+    const diff = now.getTime() - date.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     
     if (days === 0) return 'Today'

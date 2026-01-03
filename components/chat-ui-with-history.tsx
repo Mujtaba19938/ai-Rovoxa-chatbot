@@ -81,12 +81,24 @@ const ChatUIWithHistory: React.FC = () => {
     }
   })
 
+  // ============================================
+  // FIX 5: FIX SEND MESSAGE FLOW (NO EMPTY MESSAGES)
+  // ============================================
   // Custom submit handler that includes file attachments
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate input BEFORE any processing
+    const trimmed = input?.trim();
+    if (!trimmed) {
+      console.warn("⚠️ Attempted to send empty message - ignoring");
+      return; // Do nothing if message is empty
+    }
+    
+    console.log("📤 SENDING MESSAGE:", trimmed);
+    
     // Check if this message should trigger web search
-    const willTriggerWebSearch = shouldTriggerWebSearch(input)
+    const willTriggerWebSearch = shouldTriggerWebSearch(trimmed)
     if (willTriggerWebSearch) {
       setIsWebSearching(true)
     }
@@ -99,9 +111,9 @@ const ChatUIWithHistory: React.FC = () => {
       try {
         // Create FormData to send files
         const formData = new FormData();
-        formData.append('message', input);
-        formData.append('userId', userId);
-        formData.append('chatId', currentChatId);
+        formData.append('message', trimmed); // Use trimmed message
+        formData.append('userId', userId || '');
+        formData.append('chatId', currentChatId || '');
         
         // Add files to FormData
         attachedFiles.forEach((file, index) => {
@@ -152,9 +164,12 @@ const ChatUIWithHistory: React.FC = () => {
       }
     } else {
       // No files attached, use the original submit handler
-      originalHandleSubmit(e);
-      // Reset web search loading after a delay
-      setTimeout(() => setIsWebSearching(false), 2000);
+      // But ensure we're sending a valid message
+      if (trimmed) {
+        originalHandleSubmit(e);
+        // Reset web search loading after a delay
+        setTimeout(() => setIsWebSearching(false), 2000);
+      }
     }
   }
   const { theme, setTheme } = useTheme()
@@ -174,19 +189,37 @@ const ChatUIWithHistory: React.FC = () => {
     return searchKeywords.some(keyword => lowerMessage.includes(keyword))
   }
 
-  // Get messages for the current chat only
-  const currentChatMessages = historyChats?.find(chat => chat.chatId === currentChatId)?.messages || []
+  // ============================================
+  // FIX 3: CRASH-PROOF MESSAGE RENDERING
+  // ============================================
+  // Get messages for the current chat only - with safe array checks
+  const currentChat = Array.isArray(historyChats) 
+    ? historyChats.find(chat => chat?.chatId === currentChatId || chat?.id === currentChatId)
+    : null;
   
-  // Normalize current chat messages
-  const normalizedCurrentChatMessages = currentChatMessages.map(msg => ({
-    id: `history-${msg.timestamp}-${Math.random()}`,
-    role: msg.sender === 'ai' ? 'assistant' as const : 'user' as const,
-    content: msg.text,
-    timestamp: msg.timestamp
-  }))
+  const currentChatMessages = Array.isArray(currentChat?.messages) 
+    ? currentChat.messages 
+    : [];
+  
+  // Normalize current chat messages - ensure array before mapping
+  const normalizedCurrentChatMessages = Array.isArray(currentChatMessages)
+    ? currentChatMessages.map((msg: any) => ({
+        id: msg.id ?? `history-${msg.timestamp ?? Date.now()}-${Math.random()}`,
+        role: (msg.sender === 'ai' || msg.role === 'assistant') ? 'assistant' as const : 'user' as const,
+        content: msg.text ?? msg.content ?? '',
+        timestamp: msg.timestamp instanceof Date 
+          ? msg.timestamp 
+          : msg.timestamp 
+            ? new Date(msg.timestamp)
+            : new Date()
+      }))
+    : [];
+  
+  // Ensure aiMessages is an array before combining
+  const safeAiMessages = Array.isArray(aiMessages) ? aiMessages : [];
   
   // Combine current chat messages with any new AI SDK messages
-  const allMessages = [...normalizedCurrentChatMessages, ...aiMessages]
+  const allMessages = [...normalizedCurrentChatMessages, ...safeAiMessages]
 
   // Add timeout to prevent infinite loading
   useEffect(() => {
@@ -294,33 +327,54 @@ const ChatUIWithHistory: React.FC = () => {
     }
   }
 
+  // ============================================
+  // FIX 2: FIX CHAT CLICK HANDLER (ORDER MATTERS)
+  // ============================================
   const handleSelectChat = async (chatId: string) => {
-    if (chatId === 'new-chat') {
+    if (!chatId || chatId === 'new-chat') {
       // Start a new chat
       await handleNewChat()
-    } else {
-      // Load the selected chat
-      setCurrentChatId(chatId)
-      
-      // Find the selected chat and load its messages
-      const selectedChat = historyChats?.find(chat => chat.chatId === chatId)
-      if (selectedChat) {
-        // Convert chat messages to the format expected by the UI
-        const normalizedMessages = selectedChat.messages.map(msg => ({
-          id: `${msg.sender}-${msg.timestamp}-${Math.random()}`,
-          role: (msg.sender === 'ai' ? 'assistant' : 'user') as 'assistant' | 'user',
-          content: msg.text
-        }))
-        
-        setMessages(normalizedMessages as any)
-        setChatMessages(selectedChat.messages)
-        console.log("Loaded chat:", chatId, "with", selectedChat.messages.length, "messages")
-      } else {
-        console.log("Chat not found:", chatId)
-        setMessages([])
-        setChatMessages([])
-      }
+      return
     }
+    
+    // Find the selected chat - with safe array checks
+    const selectedChat = Array.isArray(historyChats)
+      ? historyChats.find(chat => chat?.chatId === chatId || chat?.id === chatId)
+      : null;
+    
+    if (!selectedChat?.id && !selectedChat?.chatId) {
+      console.warn("⚠️ Chat not found:", chatId);
+      setMessages([]);
+      setChatMessages([]);
+      return;
+    }
+    
+    // Set currentChatId FIRST before rendering
+    const validChatId = selectedChat.chatId ?? selectedChat.id ?? chatId;
+    setCurrentChatId(validChatId);
+    
+    // Get messages with safe array checks
+    const chatMessages = Array.isArray(selectedChat.messages) 
+      ? selectedChat.messages 
+      : [];
+    
+    // Convert chat messages to the format expected by the UI - with safe mapping
+    const normalizedMessages = chatMessages.map((msg: any) => ({
+      id: msg.id ?? `${msg.sender ?? msg.role ?? 'unknown'}-${msg.timestamp ?? Date.now()}-${Math.random()}`,
+      role: (msg.sender === 'ai' || msg.role === 'assistant') 
+        ? 'assistant' as const 
+        : 'user' as const,
+      content: msg.text ?? msg.content ?? '',
+      timestamp: msg.timestamp instanceof Date 
+        ? msg.timestamp 
+        : msg.timestamp 
+          ? new Date(msg.timestamp)
+          : new Date()
+    }));
+    
+    setMessages(normalizedMessages as any);
+    setChatMessages(chatMessages);
+    console.log("✅ Loaded chat:", validChatId, "with", chatMessages.length, "messages");
   }
 
   // File attachment handlers
@@ -490,7 +544,14 @@ const ChatUIWithHistory: React.FC = () => {
       <ScrollArea className="flex-grow p-4 sm:p-6" ref={scrollAreaRef}>
         <div className="max-w-3xl mx-auto space-y-3">
           <AnimatePresence initial={false}>
-            {allMessages.map((m: any, index: number) => (
+            {/* FIX 3: CRASH-PROOF MESSAGE RENDERING */}
+            {Array.isArray(allMessages) && allMessages.length > 0 ? allMessages.map((m: any, index: number) => {
+              // Additional safety check for each message
+              if (!m || typeof m !== 'object') {
+                console.warn('⚠️ Invalid message object at index', index, m);
+                return null;
+              }
+              return (
               <motion.div
                 key={m.id || `${m.sender}-${index}`}
                 layout
@@ -520,7 +581,7 @@ const ChatUIWithHistory: React.FC = () => {
                   {m.role === "assistant" && (
                     <div className="w-2 h-2 rounded-full bg-[#c7f000] mb-2 inline-block mr-2"></div>
                   )}
-                  {m.content ? m.content.split("\n").map((line: string, i: number) => (
+                  {m.content && typeof m.content === 'string' ? m.content.split("\n").map((line: string, i: number) => (
                     <span key={i}>
                       {line}
                       {i !== m.content.split("\n").length - 1 && <br />}
@@ -537,7 +598,8 @@ const ChatUIWithHistory: React.FC = () => {
                   </Avatar>
                 )}
               </motion.div>
-            ))}
+              );
+            }).filter(Boolean) : null}
           </AnimatePresence>
           {isLoading && (allMessages[allMessages.length - 1] as any)?.role === "user" && (
             <motion.div

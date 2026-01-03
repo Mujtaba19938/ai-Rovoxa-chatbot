@@ -9,7 +9,8 @@ interface Message {
 }
 
 interface Chat {
-  _id: string;
+  _id?: string;
+  id?: string;
   userId: string;
   chatId: string;
   title: string;
@@ -101,10 +102,46 @@ export const useChatHistory = () => {
       
       const data: ChatHistoryResponse = await response.json();
       
-      console.log('✅ Loaded', data.messages.length, 'messages and', data.chats.length, 'chats from history');
+      // ============================================
+      // FIX 1: NORMALIZE CHAT HISTORY DATA (CRITICAL)
+      // ============================================
+      // Normalize chats - ensure messages is always an array
+      const normalizedChats = (Array.isArray(data.chats) ? data.chats : []).map((chat: any) => ({
+        ...chat,
+        id: chat.id ?? chat._id ?? chat.chatId,
+        chatId: chat.chatId ?? chat.id ?? chat._id,
+        messages: Array.isArray(chat.messages) ? chat.messages : [],
+        createdAt: typeof chat.createdAt === "string" || typeof chat.createdAt === "number"
+          ? chat.createdAt
+          : chat.created_at || chat.updatedAt || chat.updated_at || new Date().toISOString(),
+        updatedAt: typeof chat.updatedAt === "string" || typeof chat.updatedAt === "number"
+          ? chat.updatedAt
+          : chat.updated_at || chat.createdAt || chat.created_at || new Date().toISOString(),
+        title: chat.title ?? 'New Chat',
+        userId: chat.userId ?? chat.user_id ?? userId
+      }));
       
-      setMessages(data.messages);
-      setChats(data.chats);
+      // Normalize messages to ensure consistent data shape
+      const normalizedMessages = (Array.isArray(data.messages) ? data.messages : []).map((msg: any) => ({
+        ...msg,
+        id: msg.id ?? `${msg.role ?? msg.sender ?? 'unknown'}-${msg.timestamp ?? Date.now()}-${Math.random()}`,
+        sender: msg.sender ?? (msg.role === 'assistant' ? 'ai' : msg.role === 'user' ? 'user' : 'user'),
+        role: msg.role ?? (msg.sender === 'ai' ? 'assistant' : 'user'),
+        text: msg.text ?? msg.content ?? '',
+        content: msg.content ?? msg.text ?? '',
+        timestamp: msg.timestamp instanceof Date 
+          ? msg.timestamp 
+          : typeof msg.timestamp === "string" || typeof msg.timestamp === "number"
+            ? new Date(msg.timestamp)
+            : msg.created_at 
+              ? new Date(msg.created_at)
+              : new Date()
+      }));
+      
+      console.log('✅ Loaded', normalizedMessages.length, 'messages and', normalizedChats.length, 'chats from history');
+      
+      setMessages(normalizedMessages);
+      setChats(normalizedChats);
       retryCountRef.current = 0; // Reset retry count on success
       
     } catch (err) {
