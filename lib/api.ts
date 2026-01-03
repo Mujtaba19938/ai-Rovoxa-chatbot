@@ -1,35 +1,25 @@
 /**
  * Centralized API Configuration
  * 
- * This file provides environment-aware API base URL configuration.
+ * Vercel-compatible: All API routes are now Next.js API routes (serverless)
+ * No Express server needed - all routes use relative paths
  * 
  * Usage:
- * - Local development: Set NEXT_PUBLIC_API_URL=http://localhost:5000 in .env
- * - Production: Set NEXT_PUBLIC_API_URL=https://your-backend-domain.com in Vercel
- * - If not set, defaults to empty string (same-origin requests)
+ * - All environments: Use relative paths (e.g., '/api/auth/login')
+ * - No NEXT_PUBLIC_API_URL needed anymore
  */
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || ""
+export const API_BASE_URL = "" // Always use relative paths for Next.js API routes
 
 /**
  * Helper function to build API URLs
  * @param endpoint - API endpoint path (e.g., '/api/auth/login')
- * @returns Full API URL or relative path if API_BASE_URL is empty
+ * @returns Relative path (Next.js API route)
  */
 export const getApiUrl = (endpoint: string): string => {
-  // Remove leading slash if present to avoid double slashes
+  // Ensure endpoint starts with /
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
-  
-  if (API_BASE_URL) {
-    // Remove trailing slash from base URL if present
-    const cleanBaseUrl = API_BASE_URL.endsWith('/') 
-      ? API_BASE_URL.slice(0, -1) 
-      : API_BASE_URL
-    return `${cleanBaseUrl}${cleanEndpoint}`
-  }
-  
-  // If no base URL is set, return relative path (same-origin)
+  // Always return relative path for Next.js API routes
   return cleanEndpoint
 }
 

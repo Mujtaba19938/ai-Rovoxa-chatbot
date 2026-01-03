@@ -151,8 +151,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       // Handle network errors specifically
       if (error instanceof TypeError && error.message === "Failed to fetch") {
-        const baseUrl = API_BASE_URL || "http://localhost:5000";
-        throw new Error(`Cannot connect to backend server. Please ensure the server is running at ${baseUrl}. Check your .env file for NEXT_PUBLIC_API_URL.`);
+        throw new Error(`Cannot connect to authentication service. Please check your network connection.`);
       }
       // Re-throw other errors
       throw error;
@@ -193,8 +192,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       // Handle network errors specifically
       if (error instanceof TypeError && error.message === "Failed to fetch") {
-        const baseUrl = API_BASE_URL || "http://localhost:5000";
-        throw new Error(`Cannot connect to backend server. Please ensure the server is running at ${baseUrl}. Check your .env file for NEXT_PUBLIC_API_URL.`);
+        throw new Error(`Cannot connect to authentication service. Please check your network connection.`);
       }
       // Re-throw other errors
       throw error;
