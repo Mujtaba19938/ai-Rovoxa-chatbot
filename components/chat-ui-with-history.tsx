@@ -50,6 +50,10 @@ const ChatUIWithHistory: React.FC = () => {
   const [forceStopLoading, setForceStopLoading] = useState(false)
   const [isWebSearching, setIsWebSearching] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  // Local state for immediate message display (prevents flash)
+  const [localMessages, setLocalMessages] = useState<any[]>([])
+  // Local loading state for direct API calls (not using useChat hook)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
 
   const { 
     messages: aiMessages, 
@@ -115,6 +119,12 @@ const ChatUIWithHistory: React.FC = () => {
     // ✅ Clear input state NOW (before sending) - we already have the value in 'msg'
     setInput('');
     
+    // Also clear the DOM input immediately to prevent visual delay
+    const inputElement = e.currentTarget?.querySelector('input[type="text"], textarea') as HTMLInputElement | HTMLTextAreaElement;
+    if (inputElement) {
+      inputElement.value = '';
+    }
+    
     // If there are attached files, we need to handle them
     if (attachedFiles.length > 0) {
       console.log('📎 Sending message with', attachedFiles.length, 'attached files');
@@ -166,8 +176,9 @@ const ChatUIWithHistory: React.FC = () => {
         
         toast.success(`Message sent with ${attachedFiles.length} file(s) attached`);
         
-        // Refresh the chat history to show the new message
-        await fetchChatHistory();
+        // Don't refetch chat history - we already have messages in state
+        // Refetching causes loading screen flash/blink
+        // The sidebar will update when user navigates or on next mount
         
       } catch (error) {
         console.error('❌ Error sending message with files:', error);
@@ -176,9 +187,41 @@ const ChatUIWithHistory: React.FC = () => {
       }
     } else {
       // No files attached - send message directly
-      // ✅ CRITICAL: Send the captured 'msg' value directly, don't read from state
+      // ✅ CRITICAL: Show user message IMMEDIATELY, then make API call
+      
+      // Step 1: Add user message to UI IMMEDIATELY (before API call)
+      const userMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user' as const,
+        content: msg // Use captured value
+      };
+      
+      const assistantPlaceholder = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant' as const,
+        content: ''
+      };
+      
+      // Add user message and placeholder IMMEDIATELY to local state
+      setLocalMessages((prev: any[]) => {
+        if (prev.length > 0) {
+          return [...prev, userMessage, assistantPlaceholder];
+        } else {
+          return [...normalizedCurrentChatMessages, userMessage, assistantPlaceholder];
+        }
+      });
+      
+      // Also add to useChat state
+      setMessages((prev: any[]) => {
+        const current = Array.isArray(prev) ? prev : [];
+        return [...current, userMessage, assistantPlaceholder];
+      });
+      
+      // Step 2: Set loading state
+      setIsSendingMessage(true);
+      
+      // Step 3: Make API call
       try {
-        // Make direct API call with the captured message value
         const response = await fetch(getApiUrl('/api/chat'), {
           method: 'POST',
           headers: {
@@ -201,22 +244,7 @@ const ChatUIWithHistory: React.FC = () => {
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         let assistantMessage = '';
-        let assistantMessageId = `assistant-${Date.now()}`;
-        
-        // Add user message to UI
-        const userMessage = {
-          id: `user-${Date.now()}`,
-          role: 'user' as const,
-          content: msg // Use captured value
-        };
-        setMessages((prev: any[]) => [...prev, userMessage]);
-        
-        // Add placeholder assistant message
-        setMessages((prev: any[]) => [...prev, {
-          id: assistantMessageId,
-          role: 'assistant' as const,
-          content: ''
-        }]);
+        const assistantMessageId = assistantPlaceholder.id;
         
         if (reader) {
           while (true) {
@@ -232,8 +260,17 @@ const ChatUIWithHistory: React.FC = () => {
                   const data = JSON.parse(line.slice(2));
                   assistantMessage = data;
                   
-                  // Update the assistant message
+                  // Update the assistant message in both states
                   setMessages((prev: any[]) => 
+                    prev.map((msgItem: any) => 
+                      msgItem.id === assistantMessageId 
+                        ? { ...msgItem, content: assistantMessage }
+                        : msgItem
+                    )
+                  );
+                  
+                  // Also update local state for immediate display
+                  setLocalMessages((prev: any[]) => 
                     prev.map((msgItem: any) => 
                       msgItem.id === assistantMessageId 
                         ? { ...msgItem, content: assistantMessage }
@@ -248,8 +285,12 @@ const ChatUIWithHistory: React.FC = () => {
           }
         }
         
-        // Refresh chat history
-        await fetchChatHistory();
+        // Clear loading state
+        setIsSendingMessage(false);
+        
+        // Don't refetch chat history - we already updated messages in state
+        // Refetching causes loading screen flash/blink
+        // The sidebar will update when user navigates or component re-renders
         
         // Reset web search loading
         setTimeout(() => setIsWebSearching(false), 2000);
@@ -257,7 +298,16 @@ const ChatUIWithHistory: React.FC = () => {
       } catch (error) {
         console.error('❌ Error sending message:', error);
         toast.error('Failed to send message. Please try again.');
+        setIsSendingMessage(false);
         setIsWebSearching(false);
+        
+        // Remove the placeholder assistant message on error
+        setLocalMessages((prev: any[]) => 
+          prev.filter((msg: any) => msg.id !== assistantPlaceholder.id)
+        );
+        setMessages((prev: any[]) => 
+          prev.filter((msg: any) => msg.id !== assistantPlaceholder.id)
+        );
       }
     }
   }
@@ -307,8 +357,22 @@ const ChatUIWithHistory: React.FC = () => {
   // Ensure aiMessages is an array before combining
   const safeAiMessages = Array.isArray(aiMessages) ? aiMessages : [];
   
-  // Combine current chat messages with any new AI SDK messages
-  const allMessages = [...normalizedCurrentChatMessages, ...safeAiMessages]
+  // ✅ Combine messages - prioritize localMessages for immediate display
+  // This prevents the flash when sending new messages
+  // 
+  // Priority order:
+  // 1. localMessages (when sending new messages - immediate display)
+  // 2. aiMessages (when chat is selected - set via setMessages in handleSelectChat)
+  // 3. normalizedCurrentChatMessages (fallback from historyChats)
+  //
+  // CRITICAL: When a chat is selected, handleSelectChat sets aiMessages via setMessages
+  // So we should use aiMessages directly, not combine with normalizedCurrentChatMessages
+  // (which might be stale or empty)
+  const allMessages = localMessages.length > 0
+    ? [...normalizedCurrentChatMessages, ...localMessages]
+    : safeAiMessages.length > 0 
+      ? safeAiMessages // Use aiMessages directly (set by handleSelectChat)
+      : normalizedCurrentChatMessages
 
   // Add timeout to prevent infinite loading
   useEffect(() => {
@@ -334,6 +398,8 @@ const ChatUIWithHistory: React.FC = () => {
 
   const currentOrbAnimationState: string = (() => {
     if (error || historyError) return "error"
+    // Use local loading state for direct API calls
+    if (isSendingMessage) return "thinking"
     if (isLoading && (allMessages[allMessages.length - 1] as any)?.role !== "assistant") return "thinking"
     if (isLoading) return "speaking"
     return "idle"
@@ -343,6 +409,7 @@ const ChatUIWithHistory: React.FC = () => {
     try {
       await clearChatHistory()
       setMessages([])
+      setLocalMessages([]) // Clear local messages too
       toast.success("Chat history cleared successfully")
     } catch (err) {
       console.error("Error clearing chat:", err)
@@ -377,6 +444,7 @@ const ChatUIWithHistory: React.FC = () => {
       const newChatId = generateUUID();
       setCurrentChatId(newChatId)
       setMessages([])
+      setLocalMessages([]) // Clear local messages for new chat
       setChatMessages([])
       
       // Create the new chat in the database immediately
@@ -461,9 +529,14 @@ const ChatUIWithHistory: React.FC = () => {
           : new Date()
     }));
     
+    // ✅ CRITICAL: Clear localMessages FIRST, then set messages
+    // This ensures allMessages uses the correct messages from the selected chat
+    setLocalMessages([]);
     setMessages(normalizedMessages as any);
     setChatMessages(chatMessages);
+    
     console.log("✅ Loaded chat:", validChatId, "with", chatMessages.length, "messages");
+    console.log("📝 Normalized messages:", normalizedMessages.length);
   }
 
   // File attachment handlers
@@ -670,12 +743,19 @@ const ChatUIWithHistory: React.FC = () => {
                   {m.role === "assistant" && (
                     <div className="w-2 h-2 rounded-full bg-[#c7f000] mb-2 inline-block mr-2"></div>
                   )}
-                  {m.content && typeof m.content === 'string' ? m.content.split("\n").map((line: string, i: number) => (
-                    <span key={i}>
-                      {line}
-                      {i !== m.content.split("\n").length - 1 && <br />}
+                  {m.content && typeof m.content === 'string' && m.content.trim().length > 0 ? (
+                    m.content.split("\n").map((line: string, i: number) => (
+                      <span key={i}>
+                        {line}
+                        {i !== m.content.split("\n").length - 1 && <br />}
+                      </span>
+                    ))
+                  ) : m.role === "assistant" ? (
+                    <span className="text-muted-foreground italic flex items-center gap-2">
+                      <span className="animate-pulse">●</span>
+                      Thinking...
                     </span>
-                  )) : (
+                  ) : (
                     <span className="text-muted-foreground italic">No content</span>
                   )}
                 </div>
@@ -690,7 +770,7 @@ const ChatUIWithHistory: React.FC = () => {
               );
             }).filter(Boolean) : null}
           </AnimatePresence>
-          {isLoading && (allMessages[allMessages.length - 1] as any)?.role === "user" && (
+          {(isLoading || isSendingMessage) && (allMessages[allMessages.length - 1] as any)?.role === "user" && (
             <motion.div
               layout
               initial={{ opacity: 0, y: 10 }}
