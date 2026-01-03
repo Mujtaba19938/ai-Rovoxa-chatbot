@@ -92,24 +92,28 @@ const ChatUIWithHistory: React.FC = () => {
   // ============================================
   // FIX 5: FIX SEND MESSAGE FLOW (NO EMPTY MESSAGES)
   // ============================================
-  // Custom submit handler that includes file attachments
+  // CRITICAL: Get message value FIRST, then send, then clear state
+  // React state updates are async - never read from state after clearing it
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate input BEFORE any processing
-    const trimmed = input?.trim();
-    if (!trimmed) {
+    // ✅ Get the trimmed message value FIRST (before any state updates)
+    const msg = input?.trim();
+    if (!msg || msg.length === 0) {
       console.warn("⚠️ Attempted to send empty message - ignoring");
       return; // Do nothing if message is empty
     }
     
-    console.log("📤 SENDING MESSAGE:", trimmed);
+    console.log("📤 SENDING MESSAGE:", msg);
     
     // Check if this message should trigger web search
-    const willTriggerWebSearch = shouldTriggerWebSearch(trimmed)
+    const willTriggerWebSearch = shouldTriggerWebSearch(msg)
     if (willTriggerWebSearch) {
       setIsWebSearching(true)
     }
+    
+    // ✅ Clear input state NOW (before sending) - we already have the value in 'msg'
+    setInput('');
     
     // If there are attached files, we need to handle them
     if (attachedFiles.length > 0) {
@@ -119,7 +123,7 @@ const ChatUIWithHistory: React.FC = () => {
       try {
         // Create FormData to send files
         const formData = new FormData();
-        formData.append('message', trimmed); // Use trimmed message
+        formData.append('message', msg); // Use the captured message value, not state
         formData.append('userId', userId || '');
         formData.append('chatId', currentChatId || '');
         
@@ -171,40 +175,89 @@ const ChatUIWithHistory: React.FC = () => {
         setIsUploading(false);
       }
     } else {
-      // No files attached, use the original submit handler
-      // CRITICAL FIX: The useChat hook reads 'input' state at submit time
-      // We must update the input state to trimmed value BEFORE calling originalHandleSubmit
-      if (trimmed && trimmed.length > 0) {
-        // Update the hook's input state to the trimmed value
-        // This is critical - the hook will use this value when submitting
-        setInput(trimmed);
-        
-        // Clear the input field in the DOM to prevent visual confusion
-        const inputElement = e.currentTarget?.querySelector('input[type="text"], textarea') as HTMLInputElement | HTMLTextAreaElement;
-        if (inputElement) {
-          inputElement.value = '';
-        }
-        
-        // Use requestAnimationFrame to ensure React state update is processed
-        // This ensures the useChat hook sees the updated (trimmed) input value
-        requestAnimationFrame(() => {
-          // Create a new synthetic event for the submit
-          const syntheticEvent = {
-            ...e,
-            preventDefault: () => {},
-            stopPropagation: () => {},
-          } as React.FormEvent;
-          
-          // Call original submit handler - it will now use the trimmed input from state
-          originalHandleSubmit(syntheticEvent);
+      // No files attached - send message directly
+      // ✅ CRITICAL: Send the captured 'msg' value directly, don't read from state
+      try {
+        // Make direct API call with the captured message value
+        const response = await fetch(getApiUrl('/api/chat'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            message: msg, // Use captured value, not state
+            chatId: currentChatId,
+            userId: userId
+          })
         });
         
-        // Reset web search loading after a delay
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(errorData.error || `Server error: ${response.status}`);
+        }
+        
+        // Get the streaming response
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let assistantMessage = '';
+        let assistantMessageId = `assistant-${Date.now()}`;
+        
+        // Add user message to UI
+        const userMessage = {
+          id: `user-${Date.now()}`,
+          role: 'user' as const,
+          content: msg // Use captured value
+        };
+        setMessages((prev: any[]) => [...prev, userMessage]);
+        
+        // Add placeholder assistant message
+        setMessages((prev: any[]) => [...prev, {
+          id: assistantMessageId,
+          role: 'assistant' as const,
+          content: ''
+        }]);
+        
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.startsWith('0:')) {
+                try {
+                  const data = JSON.parse(line.slice(2));
+                  assistantMessage = data;
+                  
+                  // Update the assistant message
+                  setMessages((prev: any[]) => 
+                    prev.map((msgItem: any) => 
+                      msgItem.id === assistantMessageId 
+                        ? { ...msgItem, content: assistantMessage }
+                        : msgItem
+                    )
+                  );
+                } catch (e) {
+                  // Ignore parse errors
+                }
+              }
+            }
+          }
+        }
+        
+        // Refresh chat history
+        await fetchChatHistory();
+        
+        // Reset web search loading
         setTimeout(() => setIsWebSearching(false), 2000);
-      } else {
-        console.warn("⚠️ Message validation failed - trimmed message is empty");
-        // Clear input if it's just whitespace
-        setInput('');
+        
+      } catch (error) {
+        console.error('❌ Error sending message:', error);
+        toast.error('Failed to send message. Please try again.');
+        setIsWebSearching(false);
       }
     }
   }
