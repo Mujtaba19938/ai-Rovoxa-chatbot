@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { FallbackOrb } from "./fallback-orb"
+import { HourglassIcon } from "./hourglass-icon"
 
 interface SafeOrbWrapperProps {
   orbSize?: number
@@ -16,10 +16,10 @@ export const SafeOrbWrapper: React.FC<SafeOrbWrapperProps> = ({
   colors,
   className = "w-full h-full"
 }) => {
-  // Always use the fallback orb to avoid React Three Fiber issues
+  // Use hourglass icon instead of orb
   return (
-    <FallbackOrb 
-      orbSize={orbSize} 
+    <HourglassIcon 
+      size={orbSize} 
       animationState={animationState} 
       className={className}
     />

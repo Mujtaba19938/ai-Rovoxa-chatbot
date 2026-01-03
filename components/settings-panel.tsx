@@ -57,10 +57,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
           </Select>
         </div>
 
-        {/* Orb Animation */}
+        {/* Hourglass Animation */}
         <div className="flex items-center justify-between">
           <Label htmlFor="orb-animation" className="text-foreground text-lg">
-            Orb Animation
+            Hourglass Animation
           </Label>
           <Switch
             id="orb-animation"
@@ -68,7 +68,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             onCheckedChange={setOrbAnimationEnabled}
           />
         </div>
-        <p className="text-sm text-muted-foreground -mt-6">Toggle the main orb's idle and reactive animations.</p>
+        <p className="text-sm text-muted-foreground -mt-6">Toggle the hourglass icon's idle and reactive animations.</p>
 
         {/* Voice Interaction */}
         <div className="flex items-center justify-between">

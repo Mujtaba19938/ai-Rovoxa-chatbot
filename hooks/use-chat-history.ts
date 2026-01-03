@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getUserID } from '@/lib/user-utils';
-import { getApiUrl } from '@/lib/api';
+import { getApiUrl, API_BASE_URL } from '@/lib/api';
 
 interface Message {
   sender: 'user' | 'ai';
@@ -56,13 +56,27 @@ export const useChatHistory = () => {
       
       const token = localStorage.getItem('authToken');
       
+      // Validate token exists before making request
+      if (!token) {
+        const error = new Error('Authentication token not found. Please log in again.');
+        console.error('❌ [FRONTEND] No auth token in localStorage');
+        setError(error.message);
+        setMessages([]);
+        setChats([]);
+        throw error;
+      }
+      
       // Create an AbortController for timeout handling
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
       
-      const response = await fetch(getApiUrl('/api/chat/history'), {
+      const apiUrl = getApiUrl('/api/chat/history');
+      console.log('🔍 [FRONTEND] Fetching from:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
         signal: controller.signal
       });
@@ -70,7 +84,19 @@ export const useChatHistory = () => {
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch chat history: ${response.statusText}`);
+        // Try to get error details from response
+        let errorMessage = response.statusText || 'Unknown error';
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.details) {
+            errorMessage = errorData.details;
+          }
+        } catch (e) {
+          // If response is not JSON, use status text
+        }
+        throw new Error(`Failed to fetch chat history: ${errorMessage}`);
       }
       
       const data: ChatHistoryResponse = await response.json();
@@ -82,28 +108,65 @@ export const useChatHistory = () => {
       retryCountRef.current = 0; // Reset retry count on success
       
     } catch (err) {
-      console.error('❌ Error fetching chat history:', err);
+      // ============================================
+      // REMOVED SILENT FAILURE - FAIL LOUDLY
+      // ============================================
+      console.error('❌ [FRONTEND] CHAT HISTORY FETCH FAILED:', {
+        error: err,
+        message: err instanceof Error ? err.message : String(err),
+        name: err instanceof Error ? err.name : 'Unknown',
+        stack: err instanceof Error ? err.stack : undefined
+      });
       
-      // Handle different types of errors
+      // Handle different types of errors with specific messages
+      let errorMessage = 'Failed to fetch chat history';
+      
       if (err instanceof Error) {
         if (err.name === 'AbortError') {
-          setError('Request timed out - server may be slow');
-          console.log('⏰ Chat history request timed out, using empty history');
-        } else if (err.message.includes('Failed to fetch')) {
-          setError('Server not running - please start the backend server');
-          console.log('🔌 Server not available, using empty history');
-        } else if (err.message.includes('401')) {
-          setError('Authentication failed - please log in again');
-          console.log('🔐 Authentication failed');
+          errorMessage = 'Request timed out - server may be slow';
+          console.error('⏰ [FRONTEND] Request timeout');
+        } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('fetch')) {
+          const baseUrl = API_BASE_URL || 'http://localhost:5000';
+          errorMessage = `Cannot connect to backend server at ${baseUrl}. Please ensure the server is running.`;
+          console.error('🔌 [FRONTEND] Network error - server unreachable');
+        } else if (err.message.includes('401') || err.message.includes('Unauthorized') || err.message.includes('NO_TOKEN') || err.message.includes('INVALID_TOKEN')) {
+          errorMessage = 'Authentication failed - please log in again';
+          console.error('🔐 [FRONTEND] Authentication error');
+        } else if (err.message.includes('503') || err.message.includes('DB_UNAVAILABLE') || err.message.includes('DB_CONNECTION_ERROR') || err.message.includes('TABLE_NOT_FOUND')) {
+          if (err.message.includes('TABLE_NOT_FOUND') || err.message.includes("does not exist")) {
+            errorMessage = 'Database tables not found - please run the Supabase schema migration (supabase-schema.sql)';
+            console.error('🗄️ [FRONTEND] Database tables missing');
+          } else {
+            errorMessage = 'Database service unavailable - please check backend configuration';
+            console.error('🗄️ [FRONTEND] Database unavailable');
+          }
+        } else if (err.message.includes('500') || err.message.includes('Internal Server Error')) {
+          errorMessage = 'Server error - please check backend logs';
+          console.error('🔴 [FRONTEND] Server error');
         } else {
-          setError(err.message);
+          // Don't duplicate the error message if it already starts with "Failed to fetch chat history"
+          errorMessage = err.message.startsWith('Failed to fetch chat history') 
+            ? err.message 
+            : `Failed to fetch chat history: ${err.message}`;
         }
-      } else {
-        setError('Failed to fetch chat history');
       }
       
-      setMessages([]);
-      setChats([]);
+      // Set error state - UI will display this
+      setError(errorMessage);
+      
+      // DO NOT silently return empty arrays - let the error state handle it
+      // Only clear if we're sure it's a non-critical error
+      if (err instanceof Error && (err.name === 'AbortError' || err.message.includes('timeout'))) {
+        // Timeout - keep existing data if any
+        console.warn('⚠️ [FRONTEND] Timeout - keeping existing data');
+      } else {
+        // Other errors - clear data to show error state
+        setMessages([]);
+        setChats([]);
+      }
+      
+      // DO NOT re-throw - we've handled it by setting error state
+      // Re-throwing would cause unhandled promise rejection
     } finally {
       setIsLoading(false);
       isFetchingRef.current = false;

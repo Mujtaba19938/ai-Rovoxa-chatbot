@@ -81,19 +81,52 @@ app.get("/api/health", async (req, res) => {
   
   // Test Supabase connection
   let dbStatus = "disconnected";
+  let dbError = null;
+  let tableExists = false;
+  
   try {
+    // Check if tables exist
     const { data, error } = await supabase.from('chats').select('id').limit(1);
-    if (!error) {
+    
+    if (error) {
+      dbError = {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      };
+      
+      if (error.code === '42P01') {
+        dbStatus = "table_not_found";
+        tableExists = false;
+      } else {
+        dbStatus = "error";
+        tableExists = true; // Table exists but query failed
+      }
+    } else {
       dbStatus = "connected";
+      tableExists = true;
     }
   } catch (err) {
     console.error("Database health check error:", err);
+    dbError = {
+      message: err.message,
+      stack: err.stack
+    };
   }
   
   res.json({ 
-    ok: true, 
+    ok: dbStatus === "connected", 
     model: MODEL_NAME,
-    database: dbStatus,
+    database: {
+      status: dbStatus,
+      tableExists: tableExists,
+      error: dbError
+    },
+    supabase: {
+      url: process.env.SUPABASE_URL ? "configured" : "missing",
+      serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? "configured" : "missing"
+    },
     timestamp: new Date().toISOString()
   });
 });
@@ -460,7 +493,19 @@ app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterE
     console.log("✅ Generated response:", aiResponse.substring(0, 50) + "...");
     
     // Store messages in Supabase
-    let savedChatId = chatId || uuidv4();
+    // Ensure chatId is a valid UUID format
+    let savedChatId = chatId;
+    
+    // Validate UUID format - if chatId is not a valid UUID, generate a new one
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (savedChatId && !uuidRegex.test(savedChatId)) {
+      console.warn("⚠️ [CHAT SAVE] Invalid UUID format for chatId, generating new UUID. Received:", savedChatId);
+      savedChatId = uuidv4();
+    } else if (!savedChatId) {
+      savedChatId = uuidv4();
+    }
+    
+    console.log("🔍 [CHAT SAVE] Using chatId (UUID format):", savedChatId);
     
     try {
       // Use existing chat or create new one
@@ -499,6 +544,12 @@ app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterE
           }
         }
         
+        console.log("🔍 [CHAT SAVE] Creating new chat:", {
+          id: savedChatId,
+          userId: userId,
+          title: chatTitle
+        });
+        
         const { data: newChat, error: createError } = await supabase
           .from('chats')
           .insert({
@@ -510,52 +561,121 @@ app.post("/api/chat", authenticateToken, upload.array('files', 5), handleMulterE
           .single();
         
         if (createError) {
+          console.error("❌ [CHAT SAVE] Error creating chat:", {
+            message: createError.message,
+            code: createError.code,
+            details: createError.details,
+            hint: createError.hint,
+            fullError: JSON.stringify(createError, null, 2)
+          });
           throw createError;
+        }
+        
+        if (!newChat) {
+          console.error("❌ [CHAT SAVE] Chat insert returned no data");
+          throw new Error("Chat creation returned no data");
         }
         
         chat = newChat;
         savedChatId = newChat.id;
-        console.log("🆕 Created new chat with ID:", savedChatId, "and title:", chatTitle);
+        console.log("✅ [CHAT SAVE] Created new chat with ID:", savedChatId, "and title:", chatTitle);
       }
       
       // Insert user message
       const userMessageText = fileInfo ? `${message} ${fileInfo}` : message;
-      const { error: userMsgError } = await supabase
+      console.log("🔍 [CHAT SAVE] Inserting user message:", {
+        chatId: chat.id,
+        role: 'user',
+        contentLength: userMessageText.length
+      });
+      
+      const { data: userMsgData, error: userMsgError } = await supabase
         .from('messages')
         .insert({
           chat_id: chat.id,
           role: 'user',
           content: userMessageText
-        });
+        })
+        .select();
       
       if (userMsgError) {
+        console.error("❌ [CHAT SAVE] Error inserting user message:", {
+          message: userMsgError.message,
+          code: userMsgError.code,
+          details: userMsgError.details,
+          hint: userMsgError.hint
+        });
         throw userMsgError;
       }
       
+      console.log("✅ [CHAT SAVE] User message inserted:", userMsgData?.[0]?.id);
+      
       // Insert AI response
-      const { error: aiMsgError } = await supabase
+      console.log("🔍 [CHAT SAVE] Inserting AI message:", {
+        chatId: chat.id,
+        role: 'assistant',
+        contentLength: aiResponse.length
+      });
+      
+      const { data: aiMsgData, error: aiMsgError } = await supabase
         .from('messages')
         .insert({
           chat_id: chat.id,
           role: 'assistant',
           content: aiResponse
-        });
+        })
+        .select();
       
       if (aiMsgError) {
+        console.error("❌ [CHAT SAVE] Error inserting AI message:", {
+          message: aiMsgError.message,
+          code: aiMsgError.code,
+          details: aiMsgError.details,
+          hint: aiMsgError.hint
+        });
         throw aiMsgError;
       }
       
+      console.log("✅ [CHAT SAVE] AI message inserted:", aiMsgData?.[0]?.id);
+      
       // Update chat updated_at timestamp
-      await supabase
+      const { error: updateError } = await supabase
         .from('chats')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', chat.id);
       
-      console.log("✅ Messages saved to Supabase for user:", userId);
+      if (updateError) {
+        console.error("⚠️ [CHAT SAVE] Error updating chat timestamp:", updateError.message);
+        // Non-critical, don't throw
+      }
+      
+      console.log("✅ [CHAT SAVE] All messages saved to Supabase for user:", userId);
       
     } catch (dbError) {
-      console.error("❌ Database error saving messages:", dbError);
-      // Continue even if save fails - we still return the response
+      // ============================================
+      // REMOVED SILENT FAILURE - LOG ALL DETAILS
+      // ============================================
+      console.error("❌ [CHAT SAVE] Database error saving messages:", {
+        message: dbError.message,
+        code: dbError.code,
+        details: dbError.details,
+        hint: dbError.hint,
+        stack: dbError.stack,
+        fullError: JSON.stringify(dbError, null, 2)
+      });
+      
+      // Check for specific error types
+      if (dbError.code === '42P01') {
+        console.error("❌ [CHAT SAVE] Table does not exist - run supabase-schema.sql");
+      } else if (dbError.code === '42501') {
+        console.error("❌ [CHAT SAVE] Permission denied - check RLS policies or service role key");
+      } else if (dbError.message?.includes('violates foreign key')) {
+        console.error("❌ [CHAT SAVE] Foreign key violation - chat_id might not exist");
+      }
+      
+      // Continue to return response, but log the error clearly
+      // The frontend will still get the AI response, but data won't be saved
+      console.warn("⚠️ [CHAT SAVE] Continuing without saving to database - response will still be returned");
     }
     
     return res.json({ 
@@ -681,12 +801,84 @@ app.post("/api/chat/create", authenticateToken, async (req, res) => {
 
 // Get chat history for a user (requires authentication)
 app.get("/api/chat/history", authenticateToken, async (req, res) => {
+  // ============================================
+  // STEP 1: HARD LOGGING AT TOP
+  // ============================================
+  console.log("🔍 [CHAT HISTORY] Request received");
+  console.log("🔍 [CHAT HISTORY] Headers:", {
+    authorization: req.headers.authorization ? "Present" : "Missing",
+    contentType: req.headers['content-type'] || "N/A"
+  });
+  
   try {
-    const userId = req.user.id;
+    // ============================================
+    // STEP 2: VALIDATE USER ID (Defensive)
+    // ============================================
+    if (!req.user) {
+      console.error("❌ [CHAT HISTORY] req.user is undefined - auth middleware failed");
+      return res.status(401).json({
+        error: "Authentication required",
+        code: "NO_USER"
+      });
+    }
 
-    console.log("📖 Fetching chat history for user:", userId);
+    const userId = req.user.id;
     
-    // Get all chats for user
+    if (!userId) {
+      console.error("❌ [CHAT HISTORY] userId is undefined");
+      return res.status(401).json({
+        error: "User ID not found in token",
+        code: "NO_USER_ID"
+      });
+    }
+
+    console.log("🔍 [CHAT HISTORY] User ID extracted:", userId);
+
+    // ============================================
+    // STEP 3: VALIDATE SUPABASE CLIENT
+    // ============================================
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("❌ [CHAT HISTORY] Supabase environment variables missing");
+      return res.status(503).json({
+        error: "Database service unavailable",
+        code: "DB_UNAVAILABLE",
+        details: "Supabase configuration missing"
+      });
+    }
+
+    console.log("🔍 [CHAT HISTORY] Supabase client available");
+    
+    // Test Supabase connection with a simple query
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('chats')
+        .select('id')
+        .limit(1);
+      
+      if (testError && testError.code === '42P01') {
+        console.error("❌ [CHAT HISTORY] Table 'chats' does not exist in database");
+        return res.status(503).json({
+          error: "Database table 'chats' does not exist",
+          code: "TABLE_NOT_FOUND",
+          details: "Please run the Supabase schema migration (supabase-schema.sql) in your Supabase SQL Editor"
+        });
+      }
+      
+      console.log("🔍 [CHAT HISTORY] Supabase connection test passed");
+    } catch (testErr) {
+      console.error("❌ [CHAT HISTORY] Supabase connection test failed:", testErr);
+      return res.status(503).json({
+        error: "Database connection test failed",
+        code: "DB_CONNECTION_TEST_FAILED",
+        details: testErr.message
+      });
+    }
+
+    // ============================================
+    // STEP 4: FETCH CHATS (Defensive)
+    // ============================================
+    console.log("🔍 [CHAT HISTORY] Querying chats for user:", userId);
+    
     const { data: chats, error: chatsError } = await supabase
       .from('chats')
       .select('id, title, created_at, updated_at')
@@ -694,65 +886,150 @@ app.get("/api/chat/history", authenticateToken, async (req, res) => {
       .order('updated_at', { ascending: false });
     
     if (chatsError) {
-      throw chatsError;
-    }
-    
-    // Get all messages for user's chats
-    let allMessages = [];
-    let allChats = [];
-    
-    if (chats && chats.length > 0) {
-      const chatIds = chats.map(chat => chat.id);
+      console.error("❌ [CHAT HISTORY] Database error fetching chats:", {
+        message: chatsError.message,
+        code: chatsError.code,
+        details: chatsError.details,
+        hint: chatsError.hint,
+        fullError: JSON.stringify(chatsError, null, 2)
+      });
       
-      const { data: messages, error: messagesError } = await supabase
-        .from('messages')
-        .select('id, chat_id, role, content, created_at')
-        .in('chat_id', chatIds)
-        .order('created_at', { ascending: true });
-      
-      if (messagesError) {
-        throw messagesError;
+      // Check for specific error types
+      if (chatsError.code === '42P01') {
+        // Table doesn't exist
+        return res.status(503).json({
+          error: "Database table 'chats' does not exist",
+          code: "TABLE_NOT_FOUND",
+          details: "Please run the Supabase schema migration (supabase-schema.sql)",
+          hint: chatsError.hint
+        });
       }
       
-      // Format messages to match expected structure
-      allMessages = (messages || []).map(msg => ({
-        id: msg.id,
-        chatId: msg.chat_id,
-        sender: msg.role === 'user' ? 'user' : 'ai',
-        text: msg.content,
-        timestamp: msg.created_at
-      }));
+      if (chatsError.code === '42501') {
+        // Permission denied (RLS issue)
+        return res.status(503).json({
+          error: "Database permission denied",
+          code: "RLS_PERMISSION_ERROR",
+          details: "Service role should bypass RLS. Check Supabase configuration.",
+          hint: chatsError.hint
+        });
+      }
       
-      // Format chats to match expected structure
-      allChats = (chats || []).map(chat => ({
-        chatId: chat.id,
-        userId: userId,
-        title: chat.title,
-        messages: (messages || []).filter(msg => msg.chat_id === chat.id).map(msg => ({
-          sender: msg.role === 'user' ? 'user' : 'ai',
-          text: msg.content,
-          timestamp: msg.created_at
-        })),
-        createdAt: chat.created_at,
-        updatedAt: chat.updated_at
-      }));
+      if (chatsError.message?.includes('connect') || chatsError.message?.includes('timeout') || chatsError.message?.includes('ECONNREFUSED')) {
+        return res.status(503).json({
+          error: "Database connection failed",
+          code: "DB_CONNECTION_ERROR",
+          details: chatsError.message
+        });
+      }
+      
+      // Other DB errors - return full details for debugging
+      return res.status(500).json({
+        error: "Failed to fetch chats",
+        code: "DB_QUERY_ERROR",
+        details: chatsError.message,
+        errorCode: chatsError.code,
+        hint: chatsError.hint
+      });
     }
+
+    console.log("🔍 [CHAT HISTORY] Chats query result:", {
+      count: chats?.length || 0,
+      hasData: !!chats
+    });
     
-    console.log("✅ Found", allChats.length, "chats for user:", userId);
+    // ============================================
+    // STEP 5: HANDLE EMPTY RESULTS (Not an error)
+    // ============================================
+    if (!chats || chats.length === 0) {
+      console.log("✅ [CHAT HISTORY] No chats found for user - returning empty array");
+      return res.status(200).json({ 
+        messages: [],
+        chats: [],
+        userId,
+        source: "supabase",
+        message: "No chat history found"
+      });
+    }
+
+    // ============================================
+    // STEP 6: FETCH MESSAGES (Defensive)
+    // ============================================
+    const chatIds = chats.map(chat => chat.id);
+    console.log("🔍 [CHAT HISTORY] Fetching messages for chat IDs:", chatIds);
     
-    return res.json({ 
+    const { data: messages, error: messagesError } = await supabase
+      .from('messages')
+      .select('id, chat_id, role, content, created_at')
+      .in('chat_id', chatIds)
+      .order('created_at', { ascending: true });
+    
+    if (messagesError) {
+      console.error("❌ [CHAT HISTORY] Database error fetching messages:", messagesError);
+      // Check if it's a connection error vs data error
+      if (messagesError.message?.includes('connect') || messagesError.message?.includes('timeout')) {
+        return res.status(503).json({
+          error: "Database connection failed",
+          code: "DB_CONNECTION_ERROR",
+          details: messagesError.message
+        });
+      }
+      // Other DB errors - but we can still return chats without messages
+      console.warn("⚠️ [CHAT HISTORY] Messages query failed, returning chats without messages");
+    }
+
+    // ============================================
+    // STEP 7: FORMAT RESPONSE (Safe)
+    // ============================================
+    const allMessages = (messages || []).map(msg => ({
+      id: msg.id,
+      chatId: msg.chat_id,
+      sender: msg.role === 'user' ? 'user' : 'ai',
+      text: msg.content || '',
+      timestamp: msg.created_at
+    }));
+    
+    const allChats = chats.map(chat => ({
+      chatId: chat.id,
+      userId: userId,
+      title: chat.title || 'Untitled Chat',
+      messages: (messages || []).filter(msg => msg.chat_id === chat.id).map(msg => ({
+        sender: msg.role === 'user' ? 'user' : 'ai',
+        text: msg.content || '',
+        timestamp: msg.created_at
+      })),
+      createdAt: chat.created_at,
+      updatedAt: chat.updated_at
+    }));
+    
+    console.log("✅ [CHAT HISTORY] Success - returning:", {
+      messagesCount: allMessages.length,
+      chatsCount: allChats.length,
+      userId
+    });
+    
+    return res.status(200).json({ 
       messages: allMessages,
       chats: allChats,
       userId,
       source: "supabase",
-      message: allMessages.length > 0 ? "Chat history loaded successfully" : "No chat history found"
+      message: allMessages.length > 0 ? "Chat history loaded successfully" : "No messages found"
     });
     
   } catch (err) {
-    console.error("❌ Error fetching chat history:", err);
+    // ============================================
+    // STEP 8: CATCH ALL ERRORS (Never uncaught)
+    // ============================================
+    console.error("❌ [CHAT HISTORY] Unhandled error:", {
+      message: err.message,
+      stack: err.stack,
+      name: err.name
+    });
+    
     return res.status(500).json({ 
-      error: "Failed to fetch chat history",
-      details: err.message || String(err)
+      error: "Internal server error",
+      code: "INTERNAL_ERROR",
+      details: process.env.NODE_ENV === 'development' ? err.message : "An unexpected error occurred"
     });
   }
 });

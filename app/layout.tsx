@@ -10,9 +10,12 @@ export const metadata: Metadata = {
   description: 'Your intelligent AI chatbot that engages, converts, and supports users 24/7',
   generator: 'v0.app',
   icons: {
-    icon: '/favicon.png',
-    shortcut: '/favicon.png',
-    apple: '/favicon.png',
+    icon: [
+      { url: '/hourglass-icon.png', type: 'image/png' },
+      { url: '/favicon.png', type: 'image/png', sizes: '32x32' },
+    ],
+    shortcut: '/hourglass-icon.png',
+    apple: '/hourglass-icon.png',
   },
 }
 

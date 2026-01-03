@@ -2,6 +2,7 @@
 export const maxDuration = 30
 
 import { getApiUrl } from '@/lib/api'
+import { generateUUID, isValidUUID } from '@/lib/uuid-utils'
 
 export async function POST(req: Request) {
   try {
@@ -19,9 +20,10 @@ export async function POST(req: Request) {
       })
     }
 
-    const { messages, userId }: { 
+    const { messages, userId, chatId }: { 
       messages: Array<{ role: string; content: string }>,
-      userId?: string 
+      userId?: string,
+      chatId?: string
     } = requestData
 
     // Get the last user message
@@ -48,6 +50,21 @@ export async function POST(req: Request) {
       })
     }
 
+    // Generate UUID if chatId not provided or invalid
+    let validChatId = chatId;
+    if (!validChatId) {
+      // Generate UUID-compatible chat ID
+      validChatId = generateUUID();
+      console.log("🔍 [NEXT API] Generated new chatId (UUID):", validChatId);
+    } else if (!isValidUUID(validChatId)) {
+      // Validate UUID format - if invalid, generate new one
+      console.warn("⚠️ [NEXT API] Invalid UUID format for chatId, generating new UUID. Received:", validChatId);
+      validChatId = generateUUID();
+      console.log("🔍 [NEXT API] Generated replacement chatId (UUID):", validChatId);
+    } else {
+      console.log("🔍 [NEXT API] Using provided chatId (UUID):", validChatId);
+    }
+
     // Proxy the request to the Express server with authentication
     const expressResponse = await fetch(getApiUrl('/api/chat'), {
       method: 'POST',
@@ -58,7 +75,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         message: userMessage,
         userId: userId,
-        chatId: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        chatId: validChatId
       })
     })
 

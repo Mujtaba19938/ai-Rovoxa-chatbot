@@ -17,13 +17,13 @@ import { useTheme } from "next-themes"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { SafeOrbWrapper } from "./safe-orb-wrapper"
-import SimpleAnimatedOrb from "./simple-orb"
 import { useChatHistory } from "@/hooks/use-chat-history"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { ChatSidebar } from "./chat-sidebar"
 import { ThemeSelector } from "./theme-selector"
 import { getApiUrl } from "@/lib/api"
+import { generateUUID } from "@/lib/uuid-utils"
 
 const ChatUIWithHistory: React.FC = () => {
   const { token, logout } = useAuth()
@@ -44,8 +44,8 @@ const ChatUIWithHistory: React.FC = () => {
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
   const [currentChatId, setCurrentChatId] = useState<string>(() => {
-    // Generate a unique chat ID for this session
-    return `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    // Generate a UUID-compatible chat ID for this session
+    return generateUUID();
   })
   const [forceStopLoading, setForceStopLoading] = useState(false)
   const [isWebSearching, setIsWebSearching] = useState(false)
@@ -251,7 +251,8 @@ const ChatUIWithHistory: React.FC = () => {
   const handleNewChat = async () => {
     try {
       // Generate a new unique chat ID
-      const newChatId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      // Generate UUID-compatible chat ID
+      const newChatId = generateUUID();
       setCurrentChatId(newChatId)
       setMessages([])
       setChatMessages([])

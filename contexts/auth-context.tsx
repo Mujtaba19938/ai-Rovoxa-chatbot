@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react"
-import { getApiUrl } from "@/lib/api"
+import { getApiUrl, API_BASE_URL } from "@/lib/api"
 
 interface User {
   _id: string
@@ -119,64 +119,86 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     const apiUrl = getApiUrl("/api/auth/login");
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    })
+    
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
 
-    // Check if response is JSON before parsing
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      const text = await response.text();
-      console.error("❌ Non-JSON response received:", text.substring(0, 200));
-      throw new Error(`Server returned HTML instead of JSON. Check if backend is running at ${apiUrl}`);
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("❌ Non-JSON response received:", text.substring(0, 200));
+        throw new Error(`Server returned HTML instead of JSON. Check if backend is running at ${apiUrl}`);
+      }
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed")
+      }
+
+      setUser(data.user)
+      setToken(data.token)
+      localStorage.setItem("authToken", data.token)
+      localStorage.setItem("refreshToken", data.refreshToken)
+      localStorage.setItem("user", JSON.stringify(data.user))
+    } catch (error) {
+      // Handle network errors specifically
+      if (error instanceof TypeError && error.message === "Failed to fetch") {
+        const baseUrl = API_BASE_URL || "http://localhost:5000";
+        throw new Error(`Cannot connect to backend server. Please ensure the server is running at ${baseUrl}. Check your .env file for NEXT_PUBLIC_API_URL.`);
+      }
+      // Re-throw other errors
+      throw error;
     }
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.error || "Login failed")
-    }
-
-    setUser(data.user)
-    setToken(data.token)
-    localStorage.setItem("authToken", data.token)
-    localStorage.setItem("refreshToken", data.refreshToken)
-    localStorage.setItem("user", JSON.stringify(data.user))
   }
 
   const register = async (email: string, password: string, name: string) => {
     const apiUrl = getApiUrl("/api/auth/register");
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password, name }),
-    })
+    
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password, name }),
+      })
 
-    // Check if response is JSON before parsing
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      const text = await response.text();
-      console.error("❌ Non-JSON response received:", text.substring(0, 200));
-      throw new Error(`Server returned HTML instead of JSON. Check if backend is running at ${apiUrl}`);
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("❌ Non-JSON response received:", text.substring(0, 200));
+        throw new Error(`Server returned HTML instead of JSON. Check if backend is running at ${apiUrl}`);
+      }
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Registration failed")
+      }
+
+      setUser(data.user)
+      setToken(data.token)
+      localStorage.setItem("authToken", data.token)
+      localStorage.setItem("refreshToken", data.refreshToken)
+      localStorage.setItem("user", JSON.stringify(data.user))
+    } catch (error) {
+      // Handle network errors specifically
+      if (error instanceof TypeError && error.message === "Failed to fetch") {
+        const baseUrl = API_BASE_URL || "http://localhost:5000";
+        throw new Error(`Cannot connect to backend server. Please ensure the server is running at ${baseUrl}. Check your .env file for NEXT_PUBLIC_API_URL.`);
+      }
+      // Re-throw other errors
+      throw error;
     }
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.error || "Registration failed")
-    }
-
-    setUser(data.user)
-    setToken(data.token)
-    localStorage.setItem("authToken", data.token)
-    localStorage.setItem("refreshToken", data.refreshToken)
-    localStorage.setItem("user", JSON.stringify(data.user))
   }
 
   const logout = () => {
