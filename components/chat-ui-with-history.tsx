@@ -681,30 +681,35 @@ const ChatUIWithHistory: React.FC = () => {
         className="flex-1 flex flex-col overflow-hidden min-w-0"
       >
       {/* Header Toolbar */}
-      <header className="p-4 rovoxa-bg-glass-soft border-b border-border-glass flex items-center justify-between shrink-0">
-        <div className="flex items-center space-x-3">
+      <header className="p-3 sm:p-4 rovoxa-bg-glass-soft border-b border-border-glass flex items-center justify-between shrink-0">
+        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="rovoxa-text-secondary hover:rovoxa-text-primary"
+            className="rovoxa-text-secondary hover:rovoxa-text-primary shrink-0 h-8 w-8 sm:h-10 sm:w-10"
           >
-            <MenuIcon className="h-5 w-5" />
+            <MenuIcon className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
-          <h1 className="text-lg font-semibold rovoxa-text-primary">Rovoxa</h1>
-          <div className="w-2 h-2 rounded-full bg-[#c7f000] rovoxa-glow-green"></div>
+          <h1 className="text-base sm:text-lg font-semibold rovoxa-text-primary truncate">Rovoxa</h1>
+          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#c7f000] rovoxa-glow-green shrink-0"></div>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
           <ThemeSelector />
-          <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)} className="rovoxa-text-secondary hover:rovoxa-text-primary">
-            <Settings2 size={20} />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsSettingsOpen(true)} 
+            className="rovoxa-text-secondary hover:rovoxa-text-primary h-8 w-8 sm:h-10 sm:w-10"
+          >
+            <Settings2 size={18} className="sm:w-5 sm:h-5" />
           </Button>
         </div>
       </header>
 
       {/* Chat Area */}
-      <ScrollArea className="flex-grow p-4 sm:p-6" ref={scrollAreaRef}>
-        <div className="max-w-3xl mx-auto space-y-3">
+      <ScrollArea className="flex-grow p-3 sm:p-4 md:p-6" ref={scrollAreaRef}>
+        <div className="max-w-3xl mx-auto space-y-2 sm:space-y-3">
           <AnimatePresence initial={false}>
             {/* FIX 3: CRASH-PROOF MESSAGE RENDERING */}
             {Array.isArray(allMessages) && allMessages.length > 0 ? allMessages.map((m: any, index: number) => {
@@ -721,20 +726,20 @@ const ChatUIWithHistory: React.FC = () => {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.3, ease: "easeOut" }}
-                className={cn("flex items-end space-x-2", m.role === "user" ? "justify-end" : "justify-start")}
+                className={cn("flex items-end space-x-1.5 sm:space-x-2", m.role === "user" ? "justify-end" : "justify-start")}
               >
                 {m.role === "assistant" && (
-                  <div className="w-8 h-8 shrink-0 flex items-center justify-center">
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 flex items-center justify-center">
                     <SafeOrbWrapper 
                       orbSize={1.2} 
                       animationState="idle" 
-                      className="w-6 h-6"
+                      className="w-5 h-5 sm:w-6 sm:h-6"
                     />
                   </div>
                 )}
                 <div
                   className={cn(
-                    "px-4 py-3 rounded-2xl max-w-[70%] text-sm break-words",
+                    "px-3 py-2 sm:px-4 sm:py-3 rounded-2xl max-w-[85%] sm:max-w-[75%] md:max-w-[70%] text-xs sm:text-sm break-words",
                     m.role === "user"
                       ? "rovoxa-bg-glass-soft rovoxa-text-primary rounded-br-sm border border-border-glass"
                       : "rovoxa-bg-glass-soft rovoxa-text-primary rounded-bl-sm border border-border-glass",
@@ -760,9 +765,9 @@ const ChatUIWithHistory: React.FC = () => {
                   )}
                 </div>
                 {m.role === "user" && (
-                  <Avatar className="w-6 h-6 shrink-0">
+                  <Avatar className="w-5 h-5 sm:w-6 sm:h-6 shrink-0">
                     <AvatarFallback className="bg-secondary text-secondary-foreground">
-                      <User size={14} />
+                      <User size={12} className="sm:w-3.5 sm:h-3.5" />
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -775,18 +780,18 @@ const ChatUIWithHistory: React.FC = () => {
               layout
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-end space-x-2 justify-start"
+              className="flex items-end space-x-1.5 sm:space-x-2 justify-start"
             >
-              <Avatar className="w-6 h-6 shrink-0">
+              <Avatar className="w-5 h-5 sm:w-6 sm:h-6 shrink-0">
                 <div className="w-full h-full rounded-full bg-primary flex items-center justify-center">
-                  <Bot size={14} className="text-primary-foreground" />
+                  <Bot size={12} className="sm:w-3.5 sm:h-3.5 text-primary-foreground" />
                 </div>
               </Avatar>
-              <div className="px-4 py-3 rounded-2xl rovoxa-bg-glass-soft rovoxa-text-primary rounded-bl-sm border border-border-glass">
-                <div className="flex items-center space-x-2">
+              <div className="px-3 py-2 sm:px-4 sm:py-3 rounded-2xl rovoxa-bg-glass-soft rovoxa-text-primary rounded-bl-sm border border-border-glass max-w-[85%] sm:max-w-[75%] md:max-w-[70%]">
+                <div className="flex items-center space-x-1.5 sm:space-x-2">
                   <div className="flex space-x-1">
                     <motion.div
-                      className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                      className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-muted-foreground rounded-full"
                       animate={{
                         scale: [1, 1.2, 1],
                         opacity: [0.5, 1, 0.5]
@@ -798,7 +803,7 @@ const ChatUIWithHistory: React.FC = () => {
                       }}
                     />
                     <motion.div
-                      className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                      className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-muted-foreground rounded-full"
                       animate={{
                         scale: [1, 1.2, 1],
                         opacity: [0.5, 1, 0.5]
@@ -810,7 +815,7 @@ const ChatUIWithHistory: React.FC = () => {
                       }}
                     />
                     <motion.div
-                      className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                      className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-muted-foreground rounded-full"
                       animate={{
                         scale: [1, 1.2, 1],
                         opacity: [0.5, 1, 0.5]
@@ -823,7 +828,7 @@ const ChatUIWithHistory: React.FC = () => {
                     />
                   </div>
                   {isWebSearching && (
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-xs sm:text-sm text-muted-foreground">
                       Fetching latest info...
                     </span>
                   )}
@@ -836,14 +841,14 @@ const ChatUIWithHistory: React.FC = () => {
               layout
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-end space-x-2 justify-start"
+              className="flex items-end space-x-1.5 sm:space-x-2 justify-start"
             >
-              <Avatar className="w-6 h-6 shrink-0">
+              <Avatar className="w-5 h-5 sm:w-6 sm:h-6 shrink-0">
                 <div className="w-full h-full rounded-full bg-destructive flex items-center justify-center">
-                  <Bot size={14} className="text-destructive-foreground" />
+                  <Bot size={12} className="sm:w-3.5 sm:h-3.5 text-destructive-foreground" />
                 </div>
               </Avatar>
-              <div className="px-4 py-3 rounded-2xl bg-red-500/20 text-red-400 rounded-bl-sm backdrop-blur-sm border border-red-500/30">
+              <div className="px-3 py-2 sm:px-4 sm:py-3 rounded-2xl bg-red-500/20 text-red-400 rounded-bl-sm backdrop-blur-sm border border-red-500/30 text-xs sm:text-sm max-w-[85%] sm:max-w-[75%] md:max-w-[70%] break-words">
                 Error: {error?.message || historyError || "Something went wrong."}
               </div>
             </motion.div>
@@ -852,26 +857,26 @@ const ChatUIWithHistory: React.FC = () => {
       </ScrollArea>
 
       {/* Input Area */}
-      <footer className="p-6 shrink-0">
+      <footer className="p-3 sm:p-4 md:p-6 shrink-0">
         {/* Attached Files Preview */}
         {attachedFiles.length > 0 && (
-          <div className="max-w-4xl mx-auto mb-3">
-            <div className="flex flex-wrap gap-2">
+          <div className="max-w-4xl mx-auto mb-2 sm:mb-3">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {attachedFiles.map((file, index) => (
-                <div key={index} className="flex items-center bg-muted/50 rounded-lg px-3 py-2 text-sm">
+                <div key={index} className="flex items-center bg-muted/50 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm">
                   {file.type.startsWith('image/') ? (
-                    <Image size={16} className="text-primary mr-2" />
+                    <Image size={14} className="sm:w-4 sm:h-4 text-primary mr-1.5 sm:mr-2" />
                   ) : (
-                    <File size={16} className="text-primary mr-2" />
+                    <File size={14} className="sm:w-4 sm:h-4 text-primary mr-1.5 sm:mr-2" />
                   )}
-                  <span className="rovoxa-text-primary truncate max-w-32">{file.name}</span>
+                  <span className="rovoxa-text-primary truncate max-w-24 sm:max-w-32">{file.name}</span>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => removeAttachedFile(index)}
-                    className="text-muted-foreground hover:text-destructive h-4 w-4 ml-2"
+                    className="text-muted-foreground hover:text-destructive h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1.5 sm:ml-2"
                   >
-                    <X size={12} />
+                    <X size={10} className="sm:w-3 sm:h-3" />
                   </Button>
                 </div>
               ))}
@@ -881,16 +886,16 @@ const ChatUIWithHistory: React.FC = () => {
 
         {/* Emoji Picker */}
         {isEmojiPickerOpen && (
-          <div className="max-w-4xl mx-auto mb-3">
-            <div className="rovoxa-bg-glass rounded-xl p-4 border border-border-glass rovoxa-shadow-glass">
-              <div className="grid grid-cols-8 gap-2">
+          <div className="max-w-4xl mx-auto mb-2 sm:mb-3">
+            <div className="rovoxa-bg-glass rounded-xl p-3 sm:p-4 border border-border-glass rovoxa-shadow-glass">
+              <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 sm:gap-2">
                 {['😀', '😂', '😍', '🥰', '😎', '🤔', '😮', '😢', '👍', '👎', '❤️', '🔥', '💯', '🎉', '🚀', '✨'].map((emoji) => (
                   <Button
                     key={emoji}
                     variant="ghost"
                     size="icon"
                     onClick={() => addEmoji(emoji)}
-                    className="h-8 w-8 text-lg hover:bg-muted/50"
+                    className="h-7 w-7 sm:h-8 sm:w-8 text-base sm:text-lg hover:bg-muted/50"
                   >
                     {emoji}
                   </Button>
@@ -901,7 +906,7 @@ const ChatUIWithHistory: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-          <div className="relative flex items-center rovoxa-bg-glass-soft rounded-full px-4 py-3 rovoxa-shadow-glass border border-border-glass focus-within:border-[#c7f000] focus-within:ring-2 focus-within:ring-[#c7f000]/20 transition-all duration-200">
+          <div className="relative flex items-center rovoxa-bg-glass-soft rounded-full px-3 py-2 sm:px-4 sm:py-3 rovoxa-shadow-glass border border-border-glass focus-within:border-[#c7f000] focus-within:ring-2 focus-within:ring-[#c7f000]/20 transition-all duration-200">
             {/* Hidden File Input */}
             <input
               ref={fileInputRef}
@@ -918,73 +923,73 @@ const ChatUIWithHistory: React.FC = () => {
                 size="icon" 
                 type="button" 
                 onClick={handleFileAttach}
-                className="rovoxa-text-secondary hover:rovoxa-accent-green mr-2 h-8 w-8 transition-all duration-200 hover:scale-110"
+                className="rovoxa-text-secondary hover:rovoxa-accent-green mr-1 sm:mr-2 h-7 w-7 sm:h-8 sm:w-8 transition-all duration-200 hover:scale-110"
               >
-                <Paperclip size={18} />
+                <Paperclip size={16} className="sm:w-[18px] sm:h-[18px]" />
               </Button>
-            
-            {/* Input Field */}
-            <input
-              value={input}
-              onChange={handleInputChange}
-              placeholder="Type your message..."
-              className="flex-grow bg-transparent border-none focus:ring-0 focus:outline-none rovoxa-text-primary placeholder:rovoxa-text-secondary text-base px-2"
-              disabled={isLoading}
-            />
-            
-            {/* Right Side Buttons */}
-            <div className="flex items-center space-x-1 ml-2">
-              {/* Emoji Button */}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                type="button" 
-                onClick={handleEmojiClick}
-                className={cn(
-                  "h-8 w-8 transition-all duration-200 hover:scale-110",
-                  isEmojiPickerOpen 
-                    ? "rovoxa-accent-green rovoxa-bg-accent-green-soft" 
-                    : "rovoxa-text-secondary hover:rovoxa-accent-green"
-                )}
-              >
-                <Smile size={18} />
-              </Button>
-              
-              {/* Microphone Button */}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                type="button" 
-                onClick={handleMicClick}
-                className={cn(
-                  "h-8 w-8 transition-all duration-200 hover:scale-110",
-                  isRecording 
-                    ? "text-red-400 bg-red-500/20 animate-pulse" 
-                    : "rovoxa-text-secondary hover:rovoxa-accent-green"
-                )}
-              >
-                {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
-              </Button>
-              
-              {/* Send Button */}
-              <Button
-                type="submit"
-                size="icon"
-                className={cn(
-                  "rounded-full w-8 h-8 ml-2 shrink-0 transition-all duration-200 hover:scale-105",
-                  input.trim() || attachedFiles.length > 0
-                    ? "rovoxa-btn-accent"
-                    : "rovoxa-bg-glass-soft rovoxa-text-secondary opacity-50"
-                )}
-                disabled={isLoading || isUploading || (!input.trim() && attachedFiles.length === 0)}
-              >
-                {isUploading ? (
-                  <div className="w-4 h-4 border-2 border-[#0b0f19] border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Send size={16} className={input.trim() || attachedFiles.length > 0 ? "text-[#0b0f19]" : "rovoxa-text-secondary"} />
-                )}
-              </Button>
-            </div>
+             
+             {/* Input Field */}
+             <input
+               value={input}
+               onChange={handleInputChange}
+               placeholder="Type your message..."
+               className="flex-grow bg-transparent border-none focus:ring-0 focus:outline-none rovoxa-text-primary placeholder:rovoxa-text-secondary text-sm sm:text-base px-1.5 sm:px-2"
+               disabled={isLoading}
+             />
+             
+             {/* Right Side Buttons */}
+             <div className="flex items-center space-x-0.5 sm:space-x-1 ml-1 sm:ml-2">
+               {/* Emoji Button */}
+               <Button 
+                 variant="ghost" 
+                 size="icon" 
+                 type="button" 
+                 onClick={handleEmojiClick}
+                 className={cn(
+                   "h-7 w-7 sm:h-8 sm:w-8 transition-all duration-200 hover:scale-110",
+                   isEmojiPickerOpen 
+                     ? "rovoxa-accent-green rovoxa-bg-accent-green-soft" 
+                     : "rovoxa-text-secondary hover:rovoxa-accent-green"
+                 )}
+               >
+                 <Smile size={16} className="sm:w-[18px] sm:h-[18px]" />
+               </Button>
+               
+               {/* Microphone Button */}
+               <Button 
+                 variant="ghost" 
+                 size="icon" 
+                 type="button" 
+                 onClick={handleMicClick}
+                 className={cn(
+                   "h-7 w-7 sm:h-8 sm:w-8 transition-all duration-200 hover:scale-110",
+                   isRecording 
+                     ? "text-red-400 bg-red-500/20 animate-pulse" 
+                     : "rovoxa-text-secondary hover:rovoxa-accent-green"
+                 )}
+               >
+                 {isRecording ? <MicOff size={16} className="sm:w-[18px] sm:h-[18px]" /> : <Mic size={16} className="sm:w-[18px] sm:h-[18px]" />}
+               </Button>
+               
+               {/* Send Button */}
+               <Button
+                 type="submit"
+                 size="icon"
+                 className={cn(
+                   "rounded-full w-7 h-7 sm:w-8 sm:h-8 ml-1 sm:ml-2 shrink-0 transition-all duration-200 hover:scale-105",
+                   input.trim() || attachedFiles.length > 0
+                     ? "rovoxa-btn-accent"
+                     : "rovoxa-bg-glass-soft rovoxa-text-secondary opacity-50"
+                 )}
+                 disabled={isLoading || isUploading || (!input.trim() && attachedFiles.length === 0)}
+               >
+                 {isUploading ? (
+                   <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-[#0b0f19] border-t-transparent rounded-full animate-spin" />
+                 ) : (
+                   <Send size={14} className="sm:w-4 sm:h-4" style={{ color: input.trim() || attachedFiles.length > 0 ? "#0b0f19" : undefined }} />
+                 )}
+               </Button>
+             </div>
           </div>
         </form>
       </footer>
