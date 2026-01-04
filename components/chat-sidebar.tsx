@@ -201,7 +201,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     if (days === 0) return 'Today'
     if (days === 1) return 'Yesterday'
     if (days < 7) return `${days} days ago`
-    return dateObj.toLocaleDateString()
+    return date.toLocaleDateString()
   }
 
   return (

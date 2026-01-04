@@ -10,7 +10,6 @@ import dynamic from "next/dynamic"
 import { SettingsPanel } from "./settings-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Send, Paperclip, Smile, Mic, MicOff, Settings2, MenuIcon, User, Bot, Trash2, LogOut, Image, File, X } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -389,10 +388,7 @@ const ChatUIWithHistory: React.FC = () => {
   useEffect(() => {
     // Auto-scroll to bottom
     if (scrollAreaRef.current) {
-      const scrollViewport = scrollAreaRef.current.querySelector("div[data-radix-scroll-area-viewport]")
-      if (scrollViewport) {
-        scrollViewport.scrollTop = scrollViewport.scrollHeight
-      }
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
     }
   }, [allMessages])
 
@@ -630,7 +626,7 @@ const ChatUIWithHistory: React.FC = () => {
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.5, ease: "easeInOut" }}
-        className="fixed inset-0 flex flex-col h-screen overflow-hidden"
+        className="flex flex-col h-[100dvh] w-full overflow-hidden"
         style={{ background: "var(--bg-primary)" }}
       >
         <div className="flex items-center justify-center h-full">
@@ -660,10 +656,10 @@ const ChatUIWithHistory: React.FC = () => {
 
   return (
     <div 
-      className="fixed inset-0 flex h-screen overflow-hidden"
+      className="flex flex-col h-[100dvh] w-full overflow-hidden"
       style={{ background: "var(--bg-primary)" }}
     >
-      {/* Sidebar */}
+      {/* Sidebar - Handles mobile/desktop visibility internally */}
       <ChatSidebar
         isOpen={isSidebarOpen}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -681,7 +677,7 @@ const ChatUIWithHistory: React.FC = () => {
         className="flex-1 flex flex-col overflow-hidden min-w-0"
       >
       {/* Header Toolbar */}
-      <header className="p-3 sm:p-4 rovoxa-bg-glass-soft border-b border-border-glass flex items-center justify-between shrink-0">
+      <header className="shrink-0 h-14 px-4 flex items-center justify-between border-b border-border-glass rovoxa-bg-glass-soft">
         <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
           <Button
             variant="ghost"
@@ -707,9 +703,9 @@ const ChatUIWithHistory: React.FC = () => {
         </div>
       </header>
 
-      {/* Chat Area */}
-      <ScrollArea className="flex-grow p-3 sm:p-4 md:p-6" ref={scrollAreaRef}>
-        <div className="max-w-3xl mx-auto space-y-2 sm:space-y-3">
+      {/* Chat Area - Scrollable Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-3" ref={scrollAreaRef}>
+        <div className="w-full max-w-none md:max-w-3xl mx-auto space-y-2 sm:space-y-3">
           <AnimatePresence initial={false}>
             {/* FIX 3: CRASH-PROOF MESSAGE RENDERING */}
             {Array.isArray(allMessages) && allMessages.length > 0 ? allMessages.map((m: any, index: number) => {
@@ -854,13 +850,13 @@ const ChatUIWithHistory: React.FC = () => {
             </motion.div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
-      {/* Input Area */}
-      <footer className="p-3 sm:p-4 md:p-6 shrink-0">
+      {/* Input Area - Bottom Pinned */}
+      <footer className="shrink-0 border-t border-border-glass px-3 py-2 bg-background">
         {/* Attached Files Preview */}
         {attachedFiles.length > 0 && (
-          <div className="max-w-4xl mx-auto mb-2 sm:mb-3">
+          <div className="w-full max-w-none md:max-w-4xl mx-auto mb-2 sm:mb-3">
             <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {attachedFiles.map((file, index) => (
                 <div key={index} className="flex items-center bg-muted/50 rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm">
@@ -886,7 +882,7 @@ const ChatUIWithHistory: React.FC = () => {
 
         {/* Emoji Picker */}
         {isEmojiPickerOpen && (
-          <div className="max-w-4xl mx-auto mb-2 sm:mb-3">
+          <div className="w-full max-w-none md:max-w-4xl mx-auto mb-2 sm:mb-3">
             <div className="rovoxa-bg-glass rounded-xl p-3 sm:p-4 border border-border-glass rovoxa-shadow-glass">
               <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 sm:gap-2">
                 {['😀', '😂', '😍', '🥰', '😎', '🤔', '😮', '😢', '👍', '👎', '❤️', '🔥', '💯', '🎉', '🚀', '✨'].map((emoji) => (
@@ -905,7 +901,7 @@ const ChatUIWithHistory: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+        <form onSubmit={handleSubmit} className="w-full max-w-none md:max-w-4xl mx-auto">
           <div className="relative flex items-center rovoxa-bg-glass-soft rounded-full px-3 py-2 sm:px-4 sm:py-3 rovoxa-shadow-glass border border-border-glass focus-within:border-[#c7f000] focus-within:ring-2 focus-within:ring-[#c7f000]/20 transition-all duration-200">
             {/* Hidden File Input */}
             <input
@@ -933,7 +929,7 @@ const ChatUIWithHistory: React.FC = () => {
                value={input}
                onChange={handleInputChange}
                placeholder="Type your message..."
-               className="flex-grow bg-transparent border-none focus:ring-0 focus:outline-none rovoxa-text-primary placeholder:rovoxa-text-secondary text-sm sm:text-base px-1.5 sm:px-2"
+               className="flex-grow bg-transparent border-none focus:ring-0 focus:outline-none rovoxa-text-primary placeholder:rovoxa-text-secondary text-sm sm:text-base px-1.5 sm:px-2 resize-none"
                disabled={isLoading}
              />
              
